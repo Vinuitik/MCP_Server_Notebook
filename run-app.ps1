@@ -89,12 +89,24 @@ function Build-Image {
 }
 
 function Stop-Container {
-    $existing = docker ps -q -f name=$ContainerName
+    # Check for both running and stopped containers with the same name
+    $existing = docker ps -a -q -f name=$ContainerName
     if ($existing) {
-        Write-Host "Stopping existing container..." -ForegroundColor Yellow
-        docker stop $ContainerName | Out-Null
+        Write-Host "Found existing container with name '$ContainerName'..." -ForegroundColor Yellow
+        
+        # Check if it's running first
+        $running = docker ps -q -f name=$ContainerName
+        if ($running) {
+            Write-Host "Stopping running container..." -ForegroundColor Yellow
+            docker stop $ContainerName | Out-Null
+        }
+        
+        # Remove the container (whether it was running or stopped)
+        Write-Host "Removing existing container..." -ForegroundColor Yellow
         docker rm $ContainerName | Out-Null
-        Write-Host "Container stopped and removed" -ForegroundColor Green
+        Write-Host "Container removed successfully" -ForegroundColor Green
+    } else {
+        Write-Host "No existing container found with name '$ContainerName'" -ForegroundColor Gray
     }
 }
 
@@ -107,7 +119,7 @@ function Start-Container {
         if ($LASTEXITCODE -eq 0) {
             Write-Host "Container started successfully!" -ForegroundColor Green
             Write-Host ""
-            Write-Host "Application is running at: http://localhost:$HostPort/knowledgeMCP/" -ForegroundColor Green
+            Write-Host "Application is running at: http://localhost:$HostPort/noteBooks/" -ForegroundColor Green
             Write-Host ""
             Write-Host "Useful commands:" -ForegroundColor Cyan
             Write-Host "  .\run-app.ps1 logs    - View logs" -ForegroundColor White

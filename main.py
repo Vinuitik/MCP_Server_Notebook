@@ -3,6 +3,7 @@ import requests
 import json
 from datetime import datetime, timedelta
 from data_types import CodeCell, MarkdownCell
+from utils import run_cell
 from typing import Dict, Union
 
 mcp = FastMCP("KnowledgeMCP")
@@ -409,6 +410,77 @@ def moveCell(from_index: int, to_index: int) -> Dict[str, Union[bool, str]]:
 
 
 @mcp.tool()
+def executeCodeCell(index: int) -> Dict[str, Union[bool, str, int]]:
+    """
+    Execute a code cell at the specified index and update its execution count.
+    
+    Args:
+        index: The index of the code cell to execute
+        
+    Returns:
+        Dictionary with:
+        - executed: bool (True if successful, False otherwise)
+        - stdout: str (standard output from execution)
+        - result: any (result of the last expression, if any)
+        - error: str (error message if execution failed)
+        - execution_count: int (new execution count for the cell)
+        - message: str (status message)
+    """
+    try:
+        if index < 0 or index >= len(history):
+            return {
+                "executed": False,
+                "stdout": "",
+                "result": None,
+                "error": f"Invalid index. History contains {len(history)} cells (0-{len(history)-1})",
+                "execution_count": -1,
+                "message": f"Invalid index. History contains {len(history)} cells (0-{len(history)-1})"
+            }
+        
+        cell = history[index]
+        
+        # Check if it's a code cell
+        if cell.cell_type != "code":
+            return {
+                "executed": False,
+                "stdout": "",
+                "result": None,
+                "error": f"Cell at index {index} is not a code cell (it's {cell.cell_type})",
+                "execution_count": -1,
+                "message": f"Cannot execute {cell.cell_type} cell"
+            }
+        
+        # Create execution context (you might want to persist this across executions)
+        execution_context = {}
+        
+        # Execute the cell
+        execution_result = run_cell(cell.source, execution_context)
+        
+        # Update execution count
+        current_count = getattr(cell, 'execution_count', 0) or 0
+        cell.execution_count = current_count + 1
+        
+        return {
+            "executed": True,
+            "stdout": execution_result.get("stdout", ""),
+            "result": execution_result.get("result"),
+            "error": execution_result.get("error"),
+            "execution_count": cell.execution_count,
+            "message": f"Code cell at index {index} executed successfully" if not execution_result.get("error") else f"Code cell executed with errors"
+        }
+        
+    except Exception as e:
+        return {
+            "executed": False,
+            "stdout": "",
+            "result": None,
+            "error": f"Failed to execute cell: {str(e)}",
+            "execution_count": -1,
+            "message": f"Failed to execute cell: {str(e)}"
+        }
+
+
+@mcp.tool()
 def clearHistory() -> Dict[str, Union[bool, str, int]]:
     """
     Clear all cells from the history.
@@ -439,4 +511,4 @@ def clearHistory() -> Dict[str, Union[bool, str, int]]:
 
 
 if __name__ == "__main__":
-    mcp.run(transport="streamable-http", host="0.0.0.0", port=8002, path="/knowledgeMCP/")
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=8002, path="/noteBooks/")
