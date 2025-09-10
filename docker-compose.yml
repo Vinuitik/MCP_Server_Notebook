@@ -1,0 +1,43 @@
+services:
+  mcp-server:
+    build:
+      context: ./mcpContainer
+      dockerfile: Dockerfile
+    container_name: mcp-notebook-server
+    ports:
+      - "9002:8002"
+    networks:
+      - app-network
+    environment:
+      - PYTHONPATH=/app
+
+  chatbot-web:
+    build:
+      context: ./webContainer
+      dockerfile: Dockerfile
+    container_name: mcp-notebook-web
+    ports:
+      - "9003:3000"
+    networks:
+      - app-network
+    depends_on:
+      - mcp-server
+      - notebook-agent
+
+  notebook-agent:
+    build:
+      context: ./agentContainer
+      dockerfile: Dockerfile
+    container_name: mcp-notebook-agent
+    ports:
+      - "9001:8001"
+    networks:
+      - app-network
+    depends_on:
+      - mcp-server
+    environment:
+      - MCP_SERVER_URL=http://mcp-server:8002
+
+networks:
+  app-network:
+    driver: bridge
