@@ -10,6 +10,8 @@ services:
       - app-network
     environment:
       - PYTHONPATH=/app
+    volumes:
+      - notebook-storage:/app/notebooks
 
   chatbot-web:
     build:
@@ -41,3 +43,7 @@ services:
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  notebook-storage:
+    driver: local
