@@ -8,6 +8,9 @@ COPY main.py .
 COPY data_types/ ./data_types/
 COPY utils/ ./utils/
 
+# Create notebooks directory for saving notebooks
+RUN mkdir -p /app/notebooks
+
 # Ensure Python can find the data_types and utils modules
 ENV PYTHONPATH=/app
 
