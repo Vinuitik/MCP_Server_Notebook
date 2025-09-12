@@ -806,7 +806,7 @@ def listSavedNotebooks() -> Dict[str, Union[bool, List[str], str]]:
         - success: bool (True if successful, False otherwise)
         - notebooks: List[str] (list of notebook filenames)
         - count: int (number of notebooks found)
-        - message: str (status message)
+        - message: str (status message) 
     """
     try:
         notebooks_dir = '/app/notebooks'
