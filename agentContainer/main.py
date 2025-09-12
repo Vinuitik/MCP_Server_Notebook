@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import chat, mcp
+from routers import chat, mcp, simple_chat
 from models.schemas import HealthResponse
-from dependencies.deps import get_notebook_service, get_mcp_client
+from dependencies.deps import get_notebook_service, get_mcp_client, get_simple_mcp_service
 from config.settings import settings
 import logging
 
@@ -37,8 +37,10 @@ async def startup_event():
         # Initialize services
         mcp_client = get_mcp_client()
         notebook_service = get_notebook_service()
+        simple_mcp_service = await get_simple_mcp_service()
         
         logger.info(f"Connected to MCP Server: {settings.mcp_server_url}")
+        logger.info("Initialized legacy and simple MCP services")
         logger.info(f"{settings.app_name} started successfully")
         
     except Exception as e:
@@ -51,13 +53,16 @@ async def shutdown_event():
     logger.info(f"Shutting down {settings.app_name}...")
 
 # Include routers
-app.include_router(chat.router)
+app.include_router(chat.router)  # Legacy chat endpoint
+app.include_router(simple_chat.router)  # New proper MCP LangChain endpoint
 app.include_router(mcp.router)
 
 @app.get("/", response_model=HealthResponse)
 async def root():
-    """Root endpoint"""
-    return HealthResponse(status=f"{settings.app_name} is running")
+    """Root endpoint with service information"""
+    return HealthResponse(
+        status=f"{settings.app_name} is running with proper MCP LangChain integration"
+    )
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
