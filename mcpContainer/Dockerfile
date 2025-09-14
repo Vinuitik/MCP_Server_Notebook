@@ -1,12 +1,22 @@
 FROM python:3.11-slim
 
 WORKDIR /app
-COPY requirements.txt .
+
+# Install system dependencies first (these change rarely)
 RUN apt-get update && apt-get install -y curl
-RUN pip install -r requirements.txt
+
+# Copy only requirements first for better layer caching
+COPY requirements.txt .
+
+# Use mount cache for pip to speed up builds
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements.txt
+
+# Copy application files
 COPY main.py .
 COPY data_types/ ./data_types/
 COPY utils/ ./utils/
+COPY tools/ ./tools/
 
 # Create notebooks directory for saving notebooks
 RUN mkdir -p /app/notebooks

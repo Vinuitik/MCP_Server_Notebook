@@ -10,6 +10,7 @@ services:
       - app-network
     environment:
       - PYTHONPATH=/app
+      - DOCKER_BUILDKIT=1
     volumes:
       - notebook-storage:/app/notebooks
 
@@ -25,6 +26,8 @@ services:
     depends_on:
       - mcp-server
       - notebook-agent
+    environment:
+      - DOCKER_BUILDKIT=1
 
   notebook-agent:
     build:
@@ -39,6 +42,7 @@ services:
       - mcp-server
     environment:
       - MCP_SERVER_URL=http://mcp-server:8002
+      - DOCKER_BUILDKIT=1
 
 networks:
   app-network:
