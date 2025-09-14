@@ -73,6 +73,8 @@ function Test-DockerRunning {
 
 function Build-Images {
     Write-Host "Building all Docker images..." -ForegroundColor Green
+    Write-Host "This may take a while. Showing build progress..." -ForegroundColor Yellow
+    Write-Host ""
     
     # Check if docker-compose.yml exists
     if (!(Test-Path "docker-compose.yml")) {
@@ -80,14 +82,21 @@ function Build-Images {
         return $false
     }
     
+    Write-Host "Running: docker-compose -p $ComposeProjectName build" -ForegroundColor Blue
+    
     try {
-        docker-compose -p $ComposeProjectName build
-        if ($LASTEXITCODE -eq 0) {
+        # Execute the command with real-time output
+        $process = Start-Process -FilePath "docker-compose" -ArgumentList "-p", $ComposeProjectName, "build" -NoNewWindow -PassThru -Wait
+        
+        if ($process.ExitCode -ne 0) {
+            Write-Host ""
+            Write-Host "Failed to build images (Exit code: $($process.ExitCode))" -ForegroundColor Red
+            return $false
+        }
+        else {
+            Write-Host ""
             Write-Host "All images built successfully!" -ForegroundColor Green
             return $true
-        } else {
-            Write-Host "Failed to build images" -ForegroundColor Red
-            return $false
         }
     }
     catch {
@@ -99,9 +108,18 @@ function Build-Images {
 function Stop-Containers {
     Write-Host "Stopping all containers..." -ForegroundColor Yellow
     
+    Write-Host "Running: docker-compose -p $ComposeProjectName down" -ForegroundColor Blue
+    
     try {
-        docker-compose -p $ComposeProjectName down
-        Write-Host "All containers stopped successfully" -ForegroundColor Green
+        # Execute the command with real-time output
+        $process = Start-Process -FilePath "docker-compose" -ArgumentList "-p", $ComposeProjectName, "down" -NoNewWindow -PassThru -Wait
+        
+        if ($process.ExitCode -ne 0) {
+            Write-Host "Error stopping containers (Exit code: $($process.ExitCode))" -ForegroundColor Red
+        }
+        else {
+            Write-Host "All containers stopped successfully" -ForegroundColor Green
+        }
     }
     catch {
         Write-Host "Error stopping containers: $_" -ForegroundColor Red
@@ -111,9 +129,17 @@ function Stop-Containers {
 function Start-Containers {
     Write-Host "Starting all containers..." -ForegroundColor Green
     
+    Write-Host "Running: docker-compose -p $ComposeProjectName up -d" -ForegroundColor Blue
+    
     try {
-        docker-compose -p $ComposeProjectName up -d
-        if ($LASTEXITCODE -eq 0) {
+        # Execute the command with real-time output
+        $process = Start-Process -FilePath "docker-compose" -ArgumentList "-p", $ComposeProjectName, "up", "-d" -NoNewWindow -PassThru -Wait
+        
+        if ($process.ExitCode -ne 0) {
+            Write-Host "Failed to start containers (Exit code: $($process.ExitCode))" -ForegroundColor Red
+            return $false
+        }
+        else {
             Write-Host "All containers started successfully!" -ForegroundColor Green
             Write-Host ""
             Write-Host "Services are now running:" -ForegroundColor Green
@@ -125,9 +151,6 @@ function Start-Containers {
             Write-Host "  .\run-app.ps1 logs    - View logs from all services" -ForegroundColor White
             Write-Host "  .\run-app.ps1 stop    - Stop all containers" -ForegroundColor White
             return $true
-        } else {
-            Write-Host "Failed to start containers" -ForegroundColor Red
-            return $false
         }
     }
     catch {

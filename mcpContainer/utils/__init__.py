@@ -1,9 +1,10 @@
 """
 Utils package for MCP Server Notebook.
 
-This package provides utility functions for notebook cell operations.
+This package provides utility functions for notebook cell operations and debugging.
 """
 
 from .cellUtils import run_cell
+from .debug import debug_tool, mcp_logger
 
-__all__ = ['run_cell']
+__all__ = ['run_cell', 'debug_tool', 'mcp_logger']
