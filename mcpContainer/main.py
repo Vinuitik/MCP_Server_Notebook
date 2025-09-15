@@ -5,26 +5,20 @@ import pickle
 import os
 import time
 from datetime import datetime, timedelta
-from data_types import CodeCell, MarkdownCell
+from data_types import CodeCell, MarkdownCell, NotebookState
 from utils import run_cell, debug_tool, mcp_logger
 from typing import Dict, Union, List, Any
 from tools import register_notebook_tools, register_cell_tools, register_execution_tools
 
 mcp = FastMCP("KnowledgeMCP")
 
-# Global history to store all notebook cells
-history = []
-
-# Global execution context to persist variables across cell executions
-execution_context = {}
-
-# Global execution counter
-global_execution_count = 1
+# Initialize the singleton notebook state
+notebook_state = NotebookState.get_instance()
 
 
-register_notebook_tools(mcp)
-register_cell_tools(mcp)
-register_execution_tools(mcp)
+register_notebook_tools(mcp, notebook_state)
+register_cell_tools(mcp, notebook_state)
+register_execution_tools(mcp, notebook_state)
 
 
 if __name__ == "__main__":

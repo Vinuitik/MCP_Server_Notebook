@@ -4,16 +4,9 @@ from typing import Dict, Union, List
 import os
 import json
 from datetime import datetime
-from data_types import CodeCell, MarkdownCell
-import sys
+from data_types import CodeCell, MarkdownCell, NotebookState
 
-def register_notebook_tools(mcp:FastMCP):
-    # Import globals from main module
-    main_module = sys.modules['__main__']
-    global history, execution_context, global_execution_count
-    history = main_module.history
-    execution_context = main_module.execution_context  
-    global_execution_count = main_module.global_execution_count
+def register_notebook_tools(mcp: FastMCP, notebook_state: NotebookState):
     @debug_tool
     @mcp.tool()
     def saveNotebook(filename: str) -> Dict[str, Union[bool, str]]:
@@ -46,12 +39,12 @@ def register_notebook_tools(mcp:FastMCP):
                 },
                 "nbformat": 4,
                 "nbformat_minor": 4,
-                "execution_context": execution_context,
-                "global_execution_count": global_execution_count
+                "execution_context": notebook_state.execution_context,
+                "global_execution_count": notebook_state.global_execution_count
             }
             
             # Convert cells to notebook format
-            for cell in history:
+            for cell in notebook_state.history:
                 cell_data = {
                     "cell_type": cell.cell_type,
                     "metadata": getattr(cell, 'metadata', {}),
@@ -186,7 +179,6 @@ def register_notebook_tools(mcp:FastMCP):
             - cells_loaded: int (number of cells loaded)
             - message: str (status message)
         """
-        global execution_context, global_execution_count, history
         
         try:
             # If filepath doesn't contain a directory, assume it's in the notebooks directory
@@ -208,16 +200,16 @@ def register_notebook_tools(mcp:FastMCP):
                 notebook_data = json.load(f)
             
             # Clear current history
-            history.clear()
+            notebook_state.history.clear()
             
             # Load execution context if available
             if "execution_context" in notebook_data:
-                execution_context.clear()
-                execution_context.update(notebook_data["execution_context"])
+                notebook_state.execution_context.clear()
+                notebook_state.execution_context.update(notebook_data["execution_context"])
             
             # Load global execution count if available
             if "global_execution_count" in notebook_data:
-                global_execution_count = notebook_data["global_execution_count"]
+                notebook_state.global_execution_count = notebook_data["global_execution_count"]
             
             # Load cells
             cells_loaded = 0
@@ -242,7 +234,7 @@ def register_notebook_tools(mcp:FastMCP):
                 else:
                     continue  # Skip unknown cell types
                 
-                history.append(cell)
+                notebook_state.history.append(cell)
                 cells_loaded += 1
             
             return {
@@ -293,7 +285,7 @@ def register_notebook_tools(mcp:FastMCP):
                     f.write("# Jupyter Notebook exported to Python\n")
                     f.write(f"# Generated on {datetime.now().isoformat()}\n\n")
                     
-                    for i, cell in enumerate(history):
+                    for i, cell in enumerate(notebook_state.history):
                         if cell.cell_type == "markdown":
                             # Convert markdown to comments
                             f.write(f"# Cell {i} - Markdown\n")
@@ -319,7 +311,7 @@ def register_notebook_tools(mcp:FastMCP):
                     f.write("# Jupyter Notebook\n\n")
                     f.write(f"*Exported on {datetime.now().isoformat()}*\n\n")
                     
-                    for i, cell in enumerate(history):
+                    for i, cell in enumerate(notebook_state.history):
                         if cell.cell_type == "markdown":
                             f.write(cell.source)
                             f.write("\n\n")
