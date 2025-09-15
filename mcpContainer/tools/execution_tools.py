@@ -1,15 +1,9 @@
 from fastmcp import FastMCP
 from utils import debug_tool, run_cell
 from typing import Dict, Union, List
-import sys
+from data_types import NotebookState
 
-def register_execution_tools(mcp:FastMCP):
-    # Import globals from main module
-    main_module = sys.modules['__main__']
-    global history, execution_context, global_execution_count
-    history = main_module.history
-    execution_context = main_module.execution_context  
-    global_execution_count = main_module.global_execution_count
+def register_execution_tools(mcp: FastMCP, notebook_state: NotebookState):
     @debug_tool
     @mcp.tool()
     def executeCodeCell(index: int) -> Dict[str, Union[bool, str, int]]:
@@ -28,20 +22,19 @@ def register_execution_tools(mcp:FastMCP):
             - execution_count: int (new execution count for the cell)
             - message: str (status message)
         """
-        global execution_context, global_execution_count
         
         try:
-            if index < 0 or index >= len(history):
+            if index < 0 or index >= len(notebook_state.history):
                 return {
                     "executed": False,
                     "stdout": "",
                     "result": None,
-                    "error": f"Invalid index. History contains {len(history)} cells (0-{len(history)-1})",
+                    "error": f"Invalid index. History contains {len(notebook_state.history)} cells (0-{len(notebook_state.history)-1})",
                     "execution_count": -1,
-                    "message": f"Invalid index. History contains {len(history)} cells (0-{len(history)-1})"
+                    "message": f"Invalid index. History contains {len(notebook_state.history)} cells (0-{len(notebook_state.history)-1})"
                 }
             
-            cell = history[index]
+            cell = notebook_state.history[index]
             
             # Check if it's a code cell
             if cell.cell_type != "code":
@@ -55,11 +48,10 @@ def register_execution_tools(mcp:FastMCP):
                 }
             
             # Execute the cell using persistent context
-            execution_result = run_cell(cell.source, execution_context)
+            execution_result = run_cell(cell.source, notebook_state.execution_context)
             
             # Update execution count
-            cell.execution_count = global_execution_count
-            global_execution_count += 1
+            cell.execution_count = notebook_state.get_next_execution_count()
             
             # Store outputs in the cell
             outputs = []
@@ -126,21 +118,19 @@ def register_execution_tools(mcp:FastMCP):
             - results: List[Dict] (results for each executed cell)
             - message: str (status message)
         """
-        global execution_context, global_execution_count
         
         try:
             results = []
             executed_count = 0
-            total_cells = len(history)
+            total_cells = len(notebook_state.history)
             
-            for index, cell in enumerate(history):
+            for index, cell in enumerate(notebook_state.history):
                 if cell.cell_type == "code":
                     # Execute the cell using persistent context
-                    execution_result = run_cell(cell.source, execution_context)
+                    execution_result = run_cell(cell.source, notebook_state.execution_context)
                     
                     # Update execution count
-                    cell.execution_count = global_execution_count
-                    global_execution_count += 1
+                    cell.execution_count = notebook_state.get_next_execution_count()
                     
                     # Store outputs in the cell
                     outputs = []
@@ -202,7 +192,7 @@ def register_execution_tools(mcp:FastMCP):
         except Exception as e:
             return {
                 "executed": False,
-                "total_cells": len(history),
+                "total_cells": len(notebook_state.history),
                 "executed_cells": 0,
                 "results": [],
                 "message": f"Failed to execute cells: {str(e)}"
@@ -219,20 +209,10 @@ def register_execution_tools(mcp:FastMCP):
             - restarted: bool (True if successful, False otherwise)
             - message: str (status message)
         """
-        global execution_context, global_execution_count
         
         try:
-            # Clear the execution context
-            execution_context.clear()
-            
-            # Reset execution count
-            global_execution_count = 1
-            
-            # Clear outputs from all cells and reset execution counts
-            for cell in history:
-                if cell.cell_type == "code":
-                    cell.outputs = []
-                    cell.execution_count = None
+            # Use the notebook state reset method
+            notebook_state.reset_execution_context()
             
             return {
                 "restarted": True,
@@ -258,14 +238,10 @@ def register_execution_tools(mcp:FastMCP):
             - variable_count: int (number of variables)
             - message: str (status message)
         """
-        global execution_context
         
         try:
-            # Filter out built-in variables and functions
-            user_variables = {
-                k: str(v) for k, v in execution_context.items() 
-                if not k.startswith('__') and k not in ['__builtins__']
-            }
+            # Use the notebook state method to get user variables
+            user_variables = notebook_state.get_user_variables()
             
             return {
                 "success": True,

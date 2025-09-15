@@ -1,16 +1,9 @@
 from fastmcp import FastMCP
 from utils import debug_tool
 from typing import Dict, Union
-from data_types import CodeCell, MarkdownCell
-import sys
+from data_types import CodeCell, MarkdownCell, NotebookState
 
-def register_cell_tools(mcp:FastMCP):
-    # Import globals from main module
-    main_module = sys.modules['__main__']
-    global history, execution_context, global_execution_count
-    history = main_module.history
-    execution_context = main_module.execution_context  
-    global_execution_count = main_module.global_execution_count
+def register_cell_tools(mcp: FastMCP, notebook_state: NotebookState):
     @debug_tool
     @mcp.tool()
     def createMarkdownCell(content: str) -> Dict[str, Union[bool, int, str]]:
@@ -38,10 +31,10 @@ def register_cell_tools(mcp:FastMCP):
             markdown_cell = MarkdownCell(source=content.strip())
             
             # Add to history
-            history.append(markdown_cell)
+            notebook_state.history.append(markdown_cell)
             
             # Return success with current index
-            current_index = len(history) - 1
+            current_index = len(notebook_state.history) - 1
             return {
                 "created": True,
                 "index": current_index,
@@ -86,10 +79,10 @@ def register_cell_tools(mcp:FastMCP):
             )
             
             # Add to history
-            history.append(code_cell)
+            notebook_state.history.append(code_cell)
             
             # Return success with current index
-            current_index = len(history) - 1
+            current_index = len(notebook_state.history) - 1
             return {
                 "created": True,
                 "index": current_index,
@@ -118,20 +111,19 @@ def register_cell_tools(mcp:FastMCP):
             - executed_cells: int (number of executed code cells)
             - global_execution_count: int (current global execution count)
         """
-        global global_execution_count
         
-        cell_types = [cell.cell_type for cell in history]
-        code_cells = sum(1 for cell in history if cell.cell_type == "code")
-        markdown_cells = sum(1 for cell in history if cell.cell_type == "markdown")
-        executed_cells = sum(1 for cell in history if cell.cell_type == "code" and getattr(cell, 'execution_count', None) is not None)
+        cell_types = [cell.cell_type for cell in notebook_state.history]
+        code_cells = sum(1 for cell in notebook_state.history if cell.cell_type == "code")
+        markdown_cells = sum(1 for cell in notebook_state.history if cell.cell_type == "markdown")
+        executed_cells = sum(1 for cell in notebook_state.history if cell.cell_type == "code" and getattr(cell, 'execution_count', None) is not None)
         
         return {
-            "total_cells": len(history),
+            "total_cells": len(notebook_state.history),
             "cell_types": cell_types,
             "code_cells": code_cells,
             "markdown_cells": markdown_cells,
             "executed_cells": executed_cells,
-            "global_execution_count": global_execution_count
+            "global_execution_count": notebook_state.global_execution_count
         }
 
     @debug_tool
@@ -152,16 +144,16 @@ def register_cell_tools(mcp:FastMCP):
             - outputs: List (outputs for code cells)
         """
         try:
-            if index < 0 or index >= len(history):
+            if index < 0 or index >= len(notebook_state.history):
                 return {
                     "found": False,
-                    "content": f"Invalid index. History contains {len(history)} cells (0-{len(history)-1})",
+                    "content": f"Invalid index. History contains {len(notebook_state.history)} cells (0-{len(notebook_state.history)-1})",
                     "cell_type": "",
                     "execution_count": None,
                     "outputs": []
                 }
             
-            cell = history[index]
+            cell = notebook_state.history[index]
             result = {
                 "found": True,
                 "content": cell.source,
@@ -211,18 +203,18 @@ def register_cell_tools(mcp:FastMCP):
                     "message": "Content cannot be empty"
                 }
             
-            if index < 0 or index > len(history):
+            if index < 0 or index > len(notebook_state.history):
                 return {
                     "created": False,
                     "index": -1,
-                    "message": f"Invalid index. Must be between 0 and {len(history)} (inclusive)"
+                    "message": f"Invalid index. Must be between 0 and {len(notebook_state.history)} (inclusive)"
                 }
             
             # Create the markdown cell
             markdown_cell = MarkdownCell(source=content.strip())
             
             # Insert at specified position
-            history.insert(index, markdown_cell)
+            notebook_state.history.insert(index, markdown_cell)
             
             return {
                 "created": True,
@@ -261,11 +253,11 @@ def register_cell_tools(mcp:FastMCP):
                     "message": "Content cannot be empty"
                 }
             
-            if index < 0 or index > len(history):
+            if index < 0 or index > len(notebook_state.history):
                 return {
                     "created": False,
                     "index": -1,
-                    "message": f"Invalid index. Must be between 0 and {len(history)} (inclusive)"
+                    "message": f"Invalid index. Must be between 0 and {len(notebook_state.history)} (inclusive)"
                 }
             
             # Create the code cell
@@ -275,7 +267,7 @@ def register_cell_tools(mcp:FastMCP):
             )
             
             # Insert at specified position
-            history.insert(index, code_cell)
+            notebook_state.history.insert(index, code_cell)
             
             return {
                 "created": True,
@@ -307,10 +299,10 @@ def register_cell_tools(mcp:FastMCP):
             - cell_type: str (type of the updated cell)
         """
         try:
-            if index < 0 or index >= len(history):
+            if index < 0 or index >= len(notebook_state.history):
                 return {
                     "updated": False,
-                    "message": f"Invalid index. History contains {len(history)} cells (0-{len(history)-1})",
+                    "message": f"Invalid index. History contains {len(notebook_state.history)} cells (0-{len(notebook_state.history)-1})",
                     "cell_type": ""
                 }
             
@@ -322,7 +314,7 @@ def register_cell_tools(mcp:FastMCP):
                 }
             
             # Update the cell content
-            cell = history[index]
+            cell = notebook_state.history[index]
             cell.source = content.strip()
             
             return {
@@ -355,25 +347,25 @@ def register_cell_tools(mcp:FastMCP):
             - deleted_cell_type: str (type of the deleted cell)
         """
         try:
-            if index < 0 or index >= len(history):
+            if index < 0 or index >= len(notebook_state.history):
                 return {
                     "deleted": False,
-                    "message": f"Invalid index. History contains {len(history)} cells (0-{len(history)-1})",
-                    "new_total": len(history),
+                    "message": f"Invalid index. History contains {len(notebook_state.history)} cells (0-{len(notebook_state.history)-1})",
+                    "new_total": len(notebook_state.history),
                     "deleted_cell_type": ""
                 }
             
             # Get cell type before deletion for confirmation
-            deleted_cell = history[index]
+            deleted_cell = notebook_state.history[index]
             deleted_cell_type = deleted_cell.cell_type
             
             # Remove the cell
-            history.pop(index)
+            notebook_state.history.pop(index)
             
             return {
                 "deleted": True,
                 "message": f"{deleted_cell_type.capitalize()} cell at index {index} deleted successfully",
-                "new_total": len(history),
+                "new_total": len(notebook_state.history),
                 "deleted_cell_type": deleted_cell_type
             }
             
@@ -381,7 +373,7 @@ def register_cell_tools(mcp:FastMCP):
             return {
                 "deleted": False,
                 "message": f"Failed to delete cell: {str(e)}",
-                "new_total": len(history),
+                "new_total": len(notebook_state.history),
                 "deleted_cell_type": ""
             }
 
@@ -402,17 +394,17 @@ def register_cell_tools(mcp:FastMCP):
             - cell_type: str (type of the moved cell)
         """
         try:
-            if from_index < 0 or from_index >= len(history):
+            if from_index < 0 or from_index >= len(notebook_state.history):
                 return {
                     "moved": False,
-                    "message": f"Invalid from_index. History contains {len(history)} cells (0-{len(history)-1})",
+                    "message": f"Invalid from_index. History contains {len(notebook_state.history)} cells (0-{len(notebook_state.history)-1})",
                     "cell_type": ""
                 }
             
-            if to_index < 0 or to_index >= len(history):
+            if to_index < 0 or to_index >= len(notebook_state.history):
                 return {
                     "moved": False,
-                    "message": f"Invalid to_index. History contains {len(history)} cells (0-{len(history)-1})",
+                    "message": f"Invalid to_index. History contains {len(notebook_state.history)} cells (0-{len(notebook_state.history)-1})",
                     "cell_type": ""
                 }
             
@@ -420,12 +412,12 @@ def register_cell_tools(mcp:FastMCP):
                 return {
                     "moved": True,
                     "message": "Cell is already at the target position",
-                    "cell_type": history[from_index].cell_type
+                    "cell_type": notebook_state.history[from_index].cell_type
                 }
             
             # Move the cell
-            cell = history.pop(from_index)
-            history.insert(to_index, cell)
+            cell = notebook_state.history.pop(from_index)
+            notebook_state.history.insert(to_index, cell)
             
             return {
                 "moved": True,
@@ -452,15 +444,12 @@ def register_cell_tools(mcp:FastMCP):
             - message: str (status message)
             - previous_total: int (number of cells that were cleared)
         """
-        global execution_context, global_execution_count
         
         try:
-            previous_total = len(history)
-            history.clear()
+            previous_total = notebook_state.clear_history()
             
             # Also clear execution context and reset execution count
-            execution_context.clear()
-            global_execution_count = 1
+            notebook_state.reset_execution_context()
             
             return {
                 "cleared": True,
@@ -472,6 +461,6 @@ def register_cell_tools(mcp:FastMCP):
             return {
                 "cleared": False,
                 "message": f"Failed to clear history: {str(e)}",
-                "previous_total": len(history)
+                "previous_total": len(notebook_state.history)
             }
 
