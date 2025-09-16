@@ -2,11 +2,17 @@ from fastmcp import FastMCP
 from utils import debug_tool, run_cell
 from typing import Dict, Union, List
 from data_types import NotebookState
+from schema import (
+    ExecuteCodeCellResponse,
+    ExecuteAllCellsResponse,
+    RestartKernelResponse,
+    ExecutionContextResponse
+)
 
 def register_execution_tools(mcp: FastMCP, notebook_state: NotebookState):
     @mcp.tool()
     @debug_tool
-    def executeCodeCell(index: int) -> Dict[str, Union[bool, str, int]]:
+    def executeCodeCell(index: int) -> ExecuteCodeCellResponse:
         """
         Execute a code cell at the specified index and update its execution count.
         
@@ -106,7 +112,7 @@ def register_execution_tools(mcp: FastMCP, notebook_state: NotebookState):
 
     @mcp.tool()
     @debug_tool
-    def executeAllCells() -> Dict[str, Union[bool, str, int, List[Dict]]]:
+    def executeAllCells() -> ExecuteAllCellsResponse:
         """
         Execute all code cells in the notebook in order.
         
@@ -200,7 +206,7 @@ def register_execution_tools(mcp: FastMCP, notebook_state: NotebookState):
 
     @mcp.tool()
     @debug_tool
-    def restartKernel() -> Dict[str, Union[bool, str]]:
+    def restartKernel() -> RestartKernelResponse:
         """
         Restart the kernel by clearing the execution context and resetting execution count.
         
@@ -227,7 +233,7 @@ def register_execution_tools(mcp: FastMCP, notebook_state: NotebookState):
 
     @mcp.tool()
     @debug_tool
-    def getExecutionContext() -> Dict[str, Union[bool, Dict, str]]:
+    def getExecutionContext() -> ExecutionContextResponse:
         """
         Get the current execution context (variables and their values).
         

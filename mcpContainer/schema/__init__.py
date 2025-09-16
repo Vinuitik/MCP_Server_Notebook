@@ -5,6 +5,7 @@ This package contains custom schema definitions for the MCP tools,
 providing structured response types and input validation schemas.
 """
 
+# Cell operation schemas
 from .cell_creation_response import CellCreationResponse
 from .cell_update_response import CellUpdateResponse
 from .cell_delete_response import CellDeleteResponse
@@ -13,10 +14,21 @@ from .history_info_response import HistoryInfoResponse
 from .cell_content_response import CellContentResponse
 from .clear_history_response import ClearHistoryResponse
 
-# Future schema imports will go here
-# from .execution_response import ExecutionResponse
+# Notebook operation schemas
+from .save_notebook_response import SaveNotebookResponse
+from .list_notebooks_response import ListNotebooksResponse
+from .delete_notebook_response import DeleteNotebookResponse
+from .load_notebook_response import LoadNotebookResponse
+from .export_notebook_response import ExportNotebookResponse
+
+# Execution operation schemas
+from .execute_code_cell_response import ExecuteCodeCellResponse
+from .execute_all_cells_response import ExecuteAllCellsResponse
+from .restart_kernel_response import RestartKernelResponse
+from .execution_context_response import ExecutionContextResponse
 
 __all__ = [
+    # Cell operation schemas
     'CellCreationResponse',
     'CellUpdateResponse',
     'CellDeleteResponse',
@@ -24,8 +36,17 @@ __all__ = [
     'HistoryInfoResponse',
     'CellContentResponse',
     'ClearHistoryResponse',
-    # Future exports will be added here
-    # 'ExecutionResponse',
+    # Notebook operation schemas
+    'SaveNotebookResponse',
+    'ListNotebooksResponse',
+    'DeleteNotebookResponse',
+    'LoadNotebookResponse',
+    'ExportNotebookResponse',
+    # Execution operation schemas
+    'ExecuteCodeCellResponse',
+    'ExecuteAllCellsResponse',
+    'RestartKernelResponse',
+    'ExecutionContextResponse',
 ]
 
 __version__ = "1.0.0"
