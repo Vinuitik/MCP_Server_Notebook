@@ -5,7 +5,7 @@ This module defines the response schema for cell creation tools like
 createMarkdownCell and createCodeCell to replace complex return type annotations.
 """
 
-from typing import TypedDict
+from typing_extensions import TypedDict
 
 
 class CellCreationResponse(TypedDict):
