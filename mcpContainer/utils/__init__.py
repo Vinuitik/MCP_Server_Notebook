@@ -5,6 +5,6 @@ This package provides utility functions for notebook cell operations and debuggi
 """
 
 from .cellUtils import run_cell
-from .debug import debug_tool, mcp_logger
+from .debug import debug_tool
 
-__all__ = ['run_cell', 'debug_tool', 'mcp_logger']
+__all__ = ['run_cell', 'debug_tool']

@@ -7,8 +7,8 @@ from datetime import datetime
 from data_types import CodeCell, MarkdownCell, NotebookState
 
 def register_notebook_tools(mcp: FastMCP, notebook_state: NotebookState):
-    @debug_tool
     @mcp.tool()
+    @debug_tool
     def saveNotebook(filename: str) -> Dict[str, Union[bool, str]]:
         """
         Save the current notebook state to a file.
@@ -83,8 +83,8 @@ def register_notebook_tools(mcp: FastMCP, notebook_state: NotebookState):
                 "message": f"Failed to save notebook: {str(e)}"
             }
 
-    @debug_tool
     @mcp.tool()
+    @debug_tool
     def listSavedNotebooks() -> Dict[str, Union[bool, List[str], str]]:
         """
         List all saved notebook files.
@@ -121,8 +121,8 @@ def register_notebook_tools(mcp: FastMCP, notebook_state: NotebookState):
                 "message": f"Failed to list notebooks: {str(e)}"
             }
 
-    @debug_tool
     @mcp.tool()
+    @debug_tool
     def deleteNotebook(filename: str) -> Dict[str, Union[bool, str]]:
         """
         Delete a saved notebook file.
@@ -164,8 +164,8 @@ def register_notebook_tools(mcp: FastMCP, notebook_state: NotebookState):
                 "message": f"Failed to delete notebook: {str(e)}"
             }
 
-    @debug_tool
     @mcp.tool()
+    @debug_tool
     def loadNotebook(filepath: str) -> Dict[str, Union[bool, str, int]]:
         """
         Load a notebook from a file.
@@ -250,8 +250,8 @@ def register_notebook_tools(mcp: FastMCP, notebook_state: NotebookState):
                 "message": f"Failed to load notebook: {str(e)}"
             }
 
-    @debug_tool
     @mcp.tool()
+    @debug_tool
     def exportNotebook(filename: str, format: str = "json") -> Dict[str, Union[bool, str]]:
         """
         Export the current notebook to different formats.
