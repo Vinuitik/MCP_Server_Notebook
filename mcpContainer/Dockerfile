@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
@@ -16,6 +16,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 COPY main.py .
 COPY data_types/ ./data_types/
 COPY utils/ ./utils/
+COPY schema/ ./schema/
 COPY tools/ ./tools/
 
 # Create notebooks directory for saving notebooks

@@ -2,11 +2,21 @@ from fastmcp import FastMCP
 from utils import debug_tool
 from typing import Dict, Union
 from data_types import CodeCell, MarkdownCell, NotebookState
+from schema import (
+    CellCreationResponse, 
+    CellUpdateResponse, 
+    CellDeleteResponse, 
+    CellMoveResponse,
+    HistoryInfoResponse,
+    CellContentResponse,
+    ClearHistoryResponse
+)
 
 def register_cell_tools(mcp: FastMCP, notebook_state: NotebookState):
-    @debug_tool
+    
     @mcp.tool()
-    def createMarkdownCell(content: str) -> Dict[str, Union[bool, int, str]]:
+    @debug_tool
+    def createMarkdownCell(content: str) -> CellCreationResponse:
         """
         Create a markdown cell with the given content and add it to the end of history.
         
@@ -49,9 +59,9 @@ def register_cell_tools(mcp: FastMCP, notebook_state: NotebookState):
             }
 
 
-    @debug_tool
     @mcp.tool()
-    def createCodeCell(content: str) -> Dict[str, Union[bool, int, str]]:
+    @debug_tool
+    def createCodeCell(content: str) -> CellCreationResponse:
         """
         Create a code cell with the given content and add it to the end of history.
         
@@ -96,9 +106,9 @@ def register_cell_tools(mcp: FastMCP, notebook_state: NotebookState):
                 "message": f"Failed to create code cell: {str(e)}"
             }
 
-    @debug_tool
     @mcp.tool()
-    def getHistoryInfo() -> Dict[str, Union[int, list]]:
+    @debug_tool
+    def getHistoryInfo() -> HistoryInfoResponse:
         """
         Get information about the current notebook history.
         
@@ -126,9 +136,9 @@ def register_cell_tools(mcp: FastMCP, notebook_state: NotebookState):
             "global_execution_count": notebook_state.global_execution_count
         }
 
-    @debug_tool
     @mcp.tool()
-    def getCellContent(index: int) -> Dict[str, Union[bool, str]]:
+    @debug_tool
+    def getCellContent(index: int) -> CellContentResponse:
         """
         Get the content of a cell at the specified index.
         
@@ -179,9 +189,9 @@ def register_cell_tools(mcp: FastMCP, notebook_state: NotebookState):
                 "outputs": []
             }
 
-    @debug_tool
     @mcp.tool()
-    def insertMarkdownCell(content: str, index: int) -> Dict[str, Union[bool, int, str]]:
+    @debug_tool
+    def insertMarkdownCell(content: str, index: int) -> CellCreationResponse:
         """
         Insert a markdown cell at the specified index, shifting existing cells to the right.
         
@@ -229,9 +239,9 @@ def register_cell_tools(mcp: FastMCP, notebook_state: NotebookState):
                 "message": f"Failed to insert markdown cell: {str(e)}"
             }
 
-    @debug_tool
     @mcp.tool()
-    def insertCodeCell(content: str, index: int) -> Dict[str, Union[bool, int, str]]:
+    @debug_tool
+    def insertCodeCell(content: str, index: int) -> CellCreationResponse:
         """
         Insert a code cell at the specified index, shifting existing cells to the right.
         
@@ -282,9 +292,9 @@ def register_cell_tools(mcp: FastMCP, notebook_state: NotebookState):
                 "message": f"Failed to insert code cell: {str(e)}"
             }
 
-    @debug_tool
     @mcp.tool()
-    def updateCell(index: int, content: str) -> Dict[str, Union[bool, str]]:
+    @debug_tool
+    def updateCell(index: int, content: str) -> CellUpdateResponse:
         """
         Update the content of an existing cell at the specified index.
         
@@ -330,9 +340,9 @@ def register_cell_tools(mcp: FastMCP, notebook_state: NotebookState):
                 "cell_type": ""
             }
 
-    @debug_tool
     @mcp.tool()
-    def deleteCell(index: int) -> Dict[str, Union[bool, str, int]]:
+    @debug_tool
+    def deleteCell(index: int) -> CellDeleteResponse:
         """
         Delete a cell at the specified index, shifting remaining cells to the left.
         
@@ -377,9 +387,9 @@ def register_cell_tools(mcp: FastMCP, notebook_state: NotebookState):
                 "deleted_cell_type": ""
             }
 
-    @debug_tool
     @mcp.tool()
-    def moveCell(from_index: int, to_index: int) -> Dict[str, Union[bool, str]]:
+    @debug_tool
+    def moveCell(from_index: int, to_index: int) -> CellMoveResponse:
         """
         Move a cell from one position to another.
         
@@ -432,9 +442,9 @@ def register_cell_tools(mcp: FastMCP, notebook_state: NotebookState):
                 "cell_type": ""
             }
 
-    @debug_tool
     @mcp.tool()
-    def clearHistory() -> Dict[str, Union[bool, str, int]]:
+    @debug_tool
+    def clearHistory() -> ClearHistoryResponse:
         """
         Clear all cells from the history and optionally reset the execution context.
         

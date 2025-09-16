@@ -4,8 +4,8 @@ from typing import Dict, Union, List
 from data_types import NotebookState
 
 def register_execution_tools(mcp: FastMCP, notebook_state: NotebookState):
-    @debug_tool
     @mcp.tool()
+    @debug_tool
     def executeCodeCell(index: int) -> Dict[str, Union[bool, str, int]]:
         """
         Execute a code cell at the specified index and update its execution count.
@@ -104,8 +104,8 @@ def register_execution_tools(mcp: FastMCP, notebook_state: NotebookState):
                 "message": f"Failed to execute cell: {str(e)}"
             }
 
-    @debug_tool
     @mcp.tool()
+    @debug_tool
     def executeAllCells() -> Dict[str, Union[bool, str, int, List[Dict]]]:
         """
         Execute all code cells in the notebook in order.
@@ -198,8 +198,8 @@ def register_execution_tools(mcp: FastMCP, notebook_state: NotebookState):
                 "message": f"Failed to execute cells: {str(e)}"
             }
 
-    @debug_tool
     @mcp.tool()
+    @debug_tool
     def restartKernel() -> Dict[str, Union[bool, str]]:
         """
         Restart the kernel by clearing the execution context and resetting execution count.
@@ -225,8 +225,8 @@ def register_execution_tools(mcp: FastMCP, notebook_state: NotebookState):
                 "message": f"Failed to restart kernel: {str(e)}"
             }
 
-    @debug_tool
     @mcp.tool()
+    @debug_tool
     def getExecutionContext() -> Dict[str, Union[bool, Dict, str]]:
         """
         Get the current execution context (variables and their values).
