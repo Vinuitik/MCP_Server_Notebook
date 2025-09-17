@@ -1,6 +1,7 @@
 from fastmcp import FastMCP
 from utils import debug_tool
 from typing import Dict, Union, List
+from utils import serialize_execution_context
 import os
 import json
 from datetime import datetime
@@ -30,6 +31,8 @@ def register_notebook_tools(mcp: FastMCP, notebook_state: NotebookState):
             - message: str (status message)
         """
         try:
+            # Get only user-defined variables (excluding built-ins)
+            user_variables = notebook_state.get_user_variables()
             # Create a notebook structure
             notebook_data = {
                 "cells": [],
@@ -41,12 +44,12 @@ def register_notebook_tools(mcp: FastMCP, notebook_state: NotebookState):
                     },
                     "language_info": {
                         "name": "python",
-                        "version": "3.8.0"
+                        "version": "3.12.0"
                     }
                 },
                 "nbformat": 4,
                 "nbformat_minor": 4,
-                "execution_context": notebook_state.execution_context,
+                "user_variables": user_variables,
                 "global_execution_count": notebook_state.global_execution_count
             }
             
@@ -64,6 +67,16 @@ def register_notebook_tools(mcp: FastMCP, notebook_state: NotebookState):
                 
                 notebook_data["cells"].append(cell_data)
             
+            # Test JSON serialization first before creating any files
+            try:
+                json_string = json.dumps(notebook_data, indent=2, ensure_ascii=False)
+            except (TypeError, ValueError) as json_error:
+                return {
+                    "saved": False,
+                    "filepath": "",
+                    "message": f"Failed to serialize notebook data to JSON: {str(json_error)}"
+                }
+            
             # Ensure the filename has .ipynb extension
             if not filename.endswith('.ipynb'):
                 filename += '.ipynb'
@@ -72,10 +85,10 @@ def register_notebook_tools(mcp: FastMCP, notebook_state: NotebookState):
             notebooks_dir = '/app/notebooks'
             os.makedirs(notebooks_dir, exist_ok=True)
             
-            # Save to file
+            # Save to file (only after successful JSON serialization)
             filepath = os.path.join(notebooks_dir, filename)
             with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(notebook_data, f, indent=2, ensure_ascii=False)
+                f.write(json_string)
             
             return {
                 "saved": True,
