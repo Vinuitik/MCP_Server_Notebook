@@ -1,3 +1,5 @@
+from typing import List, Dict, Any
+
 def run_cell(code: str, context: dict):
     import io, sys, traceback
 
@@ -37,3 +39,18 @@ def run_cell(code: str, context: dict):
         "result": result,
         "error": error,
     }
+
+def serialize_execution_context(context: Dict[str, any]) -> Dict[str, str]:
+        """Convert execution context to JSON-serializable format"""
+        serialized = {}
+        for key, value in context.items():
+            try:
+                # Try to convert to string representation
+                if isinstance(value, (str, int, float, bool, list, dict)):
+                    serialized[key] = value
+                else:
+                    serialized[key] = str(value)
+            except Exception:
+                # If conversion fails, use type name
+                serialized[key] = f"<{type(value).__name__}>"
+        return serialized
