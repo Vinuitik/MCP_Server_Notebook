@@ -25,7 +25,7 @@ services:
       - app-network
     depends_on:
       - mcp-server
-      - notebook-agent
+      - notebook-agent 
     environment:
       - DOCKER_BUILDKIT=1
 
