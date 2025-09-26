@@ -27,10 +27,13 @@ class Settings:
         self.llm_max_tokens = llm_config.get("max_tokens", 2048)
         self.llm_timeout = llm_config.get("timeout", 30)
         
-        # API Keys from environment
-        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
-        if not self.gemini_api_key:
-            raise ValueError("GEMINI_API_KEY is required")
+        # Google Cloud Service Account Configuration
+        self.google_credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        self.project_id = os.getenv("PROJECT_ID")
+        if not self.google_credentials_path:
+            raise ValueError("GOOGLE_APPLICATION_CREDENTIALS is required")
+        if not self.project_id:
+            raise ValueError("PROJECT_ID is required")
         
         # MCP settings from config and environment
         mcp_config = self.config.get("mcp", {})

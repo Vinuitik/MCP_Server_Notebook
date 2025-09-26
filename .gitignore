@@ -1,5 +1,6 @@
 # Environment files
 agentContainer/.env
+agentContainer/service-account-key.json
 .env
 
 # Python cache files

@@ -16,6 +16,8 @@ llm:
   temperature: 0.7
   max_tokens: 2048
   timeout: 30
+  # Authentication via Google Cloud Service Account
+  auth_method: "service_account"
 
 # MCP Server Configuration
 mcp:
