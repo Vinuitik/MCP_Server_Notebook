@@ -3,8 +3,12 @@
 
 param(
     [Parameter(Position=0)]
-    [ValidateSet("build", "run", "restart", "stop", "logs", "clean", "help")]
-    [string]$Action = "run"
+    [ValidateSet("build", "run", "restart", "stop", "logs", "clean", "test-agent", "switch-model", "help")]
+    [string]$Action = "run",
+    
+    [Parameter(Position=1)]
+    [ValidateSet("gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.0-pro")]
+    [string]$Model = ""
 )
 
 # Configuration
@@ -16,23 +20,27 @@ function Show-Help {
     Write-Host "Usage: .\run-app.ps1 [action]" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "Actions:" -ForegroundColor Cyan
-    Write-Host "  build    - Build all Docker images" -ForegroundColor White
-    Write-Host "  run      - Build and run all containers (default)" -ForegroundColor White
-    Write-Host "  restart  - Stop and restart all containers" -ForegroundColor White
-    Write-Host "  stop     - Stop all running containers" -ForegroundColor White
-    Write-Host "  logs     - Show logs from all containers" -ForegroundColor White
-    Write-Host "  clean    - Stop all containers and remove images" -ForegroundColor White
-    Write-Host "  help     - Show this help message" -ForegroundColor White
+    Write-Host "  build        - Build all Docker images" -ForegroundColor White
+    Write-Host "  run          - Build and run all containers (default)" -ForegroundColor White
+    Write-Host "  restart      - Stop and restart all containers" -ForegroundColor White
+    Write-Host "  stop         - Stop all running containers" -ForegroundColor White
+    Write-Host "  logs         - Show logs from all containers" -ForegroundColor White
+    Write-Host "  clean        - Stop all containers and remove images" -ForegroundColor White
+    Write-Host "  test-agent   - Test the agent API integration" -ForegroundColor White
+    Write-Host "  switch-model - Switch Gemini model (use with -Model parameter)" -ForegroundColor White
+    Write-Host "  help         - Show this help message" -ForegroundColor White
     Write-Host ""
     Write-Host "Services:" -ForegroundColor Cyan
-    Write-Host "  - MCP Server (port 9002)" -ForegroundColor White
+    Write-Host "  - Nginx Frontend (port 9000)" -ForegroundColor White
     Write-Host "  - AI Agent (port 9001)" -ForegroundColor White
+    Write-Host "  - MCP Server (port 9002)" -ForegroundColor White
     Write-Host "  - Web Interface (port 9003)" -ForegroundColor White
     Write-Host ""
     Write-Host "Examples:" -ForegroundColor Cyan
-    Write-Host "  .\run-app.ps1                # Build and run all services" -ForegroundColor Gray
-    Write-Host "  .\run-app.ps1 build          # Just build all images" -ForegroundColor Gray
-    Write-Host "  .\run-app.ps1 logs           # View logs from all services" -ForegroundColor Gray
+    Write-Host "  .\run-app.ps1                          # Build and run all services" -ForegroundColor Gray
+    Write-Host "  .\run-app.ps1 build                    # Just build all images" -ForegroundColor Gray
+    Write-Host "  .\run-app.ps1 logs                     # View logs from all services" -ForegroundColor Gray
+    Write-Host "  .\run-app.ps1 switch-model -Model gemini-1.5-flash  # Switch to faster model" -ForegroundColor Gray
 }
 
 function Test-DockerInstalled {
@@ -246,6 +254,58 @@ switch ($Action) {
     
     "clean" {
         Clean-All
+    }
+    
+    "test-agent" {
+        Write-Host "Testing Agent API Integration..." -ForegroundColor Yellow
+        if (Test-Path ".\test-agent.ps1") {
+            & ".\test-agent.ps1"
+        } else {
+            Write-Host "test-agent.ps1 not found. Creating it..." -ForegroundColor Yellow
+            Write-Host "You can run the agent test manually after the services are running." -ForegroundColor Cyan
+        }
+    }
+    
+    "switch-model" {
+        if (-not $Model) {
+            Write-Host "Please specify a model with -Model parameter:" -ForegroundColor Red
+            Write-Host "  gemini-1.5-pro   - Best quality, slower" -ForegroundColor Gray
+            Write-Host "  gemini-1.5-flash - Faster, good quality" -ForegroundColor Gray
+            Write-Host "  gemini-1.0-pro   - Stable, general purpose" -ForegroundColor Gray
+            Write-Host ""
+            Write-Host "Example: .\run-app.ps1 switch-model -Model gemini-1.5-flash" -ForegroundColor Yellow
+            exit 1
+        }
+        
+        Write-Host "Switching to Gemini model: $Model" -ForegroundColor Yellow
+        
+        # Update .env file
+        $envPath = ".\agentContainer\.env"
+        if (Test-Path $envPath) {
+            $envContent = Get-Content $envPath
+            $newContent = @()
+            $modelUpdated = $false
+            
+            foreach ($line in $envContent) {
+                if ($line -match "^GEMINI_MODEL=") {
+                    $newContent += "GEMINI_MODEL=$Model"
+                    $modelUpdated = $true
+                } else {
+                    $newContent += $line
+                }
+            }
+            
+            if (-not $modelUpdated) {
+                $newContent += "GEMINI_MODEL=$Model"
+            }
+            
+            $newContent | Set-Content $envPath
+            Write-Host "✅ Updated .env file with model: $Model" -ForegroundColor Green
+            Write-Host "🔄 Restart the services to apply changes: .\run-app.ps1 restart" -ForegroundColor Cyan
+        } else {
+            Write-Host "❌ .env file not found at $envPath" -ForegroundColor Red
+            exit 1
+        }
     }
     
     default {

@@ -3,7 +3,9 @@ Agent Controller - FastAPI routes for the MCP Agent
 """
 from typing import Dict, Any
 from fastapi import APIRouter, HTTPException, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
+import io
+import json
 
 from models.schemas import (
     HealthResponse, 
@@ -12,9 +14,13 @@ from models.schemas import (
     NotebookRequest,
     AgentStatusResponse,
     ChatMessage,
-    ChatResponse
+    ChatResponse,
+    AgentTaskRequest,
+    AgentTaskResponse,
+    NotebookDownloadResponse
 )
 from services.mcp_service import MCPService
+from agent import run_agent
 
 # Router instance
 router = APIRouter()
@@ -156,4 +162,132 @@ async def delete_notebook(name: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete notebook: {str(e)}"
+        )
+
+
+@router.post("/agent/run", response_model=AgentTaskResponse)
+async def run_agent_task(request: AgentTaskRequest):
+    """Run an agent task with MCP tools"""
+    if not mcp_service or not mcp_service.is_connected():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="MCP service not connected"
+        )
+    
+    try:
+        # Run the agent
+        result = await run_agent(request.task, mcp_service)
+        
+        # Optionally save notebook if requested
+        if request.save_notebook:
+            filename = request.notebook_filename or f"agent_task_{hash(request.task) % 10000}.ipynb"
+            try:
+                save_result = await mcp_service.call_mcp_tool("saveNotebook", {"filename": filename})
+                result["notebook_saved"] = save_result
+            except Exception as save_error:
+                result["notebook_save_error"] = str(save_error)
+        
+        return AgentTaskResponse(
+            success=result["success"],
+            task=result["task"],
+            outputs=result["outputs"],
+            attempts=result["attempts"],
+            notebook_data=result.get("notebook_data")
+        )
+        
+    except Exception as e:
+        return AgentTaskResponse(
+            success=False,
+            task=request.task,
+            outputs=[],
+            attempts=0,
+            error=str(e)
+        )
+
+
+@router.get("/agent/download/{filename}")
+async def download_notebook(filename: str):
+    """Download a notebook file"""
+    if not mcp_service or not mcp_service.is_connected():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="MCP service not connected"
+        )
+    
+    try:
+        # Load the notebook
+        notebook_result = await mcp_service.load_notebook(filename)
+        
+        if not notebook_result or not notebook_result.get("loaded"):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Notebook not found: {filename}"
+            )
+        
+        # Get the notebook content 
+        # Since we don't have direct access to the notebook content from load_notebook,
+        # we'll need to get it through the exportNotebook tool
+        export_result = await mcp_service.call_mcp_tool("exportNotebook", {
+            "filename": filename,
+            "format": "json"
+        })
+        
+        if not export_result.get("exported"):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to export notebook"
+            )
+        
+        # Create a JSON response for download
+        notebook_json = json.dumps(export_result, indent=2)
+        
+        # Create streaming response for download
+        file_like = io.BytesIO(notebook_json.encode('utf-8'))
+        
+        return StreamingResponse(
+            io.BytesIO(notebook_json.encode('utf-8')),
+            media_type="application/json",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to download notebook: {str(e)}"
+        )
+
+
+@router.get("/agent/notebook/{filename}", response_model=NotebookDownloadResponse)
+async def get_notebook_info(filename: str):
+    """Get notebook information and download URL"""
+    if not mcp_service or not mcp_service.is_connected():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="MCP service not connected"
+        )
+    
+    try:
+        # Check if notebook exists
+        notebooks = await mcp_service.list_notebooks()
+        
+        if filename not in notebooks.get("notebooks", []):
+            return NotebookDownloadResponse(
+                success=False,
+                filename=filename,
+                error="Notebook not found"
+            )
+        
+        return NotebookDownloadResponse(
+            success=True,
+            filename=filename,
+            download_url=f"/api/v1/agent/download/{filename}"
+        )
+        
+    except Exception as e:
+        return NotebookDownloadResponse(
+            success=False,
+            filename=filename,
+            error=str(e)
         )

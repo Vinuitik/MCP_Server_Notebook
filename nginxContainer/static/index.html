@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Notebook Agent Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1><i class="fas fa-robot"></i> MCP Notebook Agent</h1>
+                <p>Intelligent Jupyter Notebook Creation & Management</p>
+            </div>
+            <div class="status-indicators">
+                <div class="status-item" id="agent-status">
+                    <i class="fas fa-circle"></i>
+                    <span>Agent: <span id="agent-status-text">Checking...</span></span>
+                </div>
+                <div class="status-item" id="mcp-status">
+                    <i class="fas fa-circle"></i>
+                    <span>MCP: <span id="mcp-status-text">Checking...</span></span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Agent Task Section -->
+            <section class="card task-section">
+                <h2><i class="fas fa-magic"></i> Create Notebook with AI Agent</h2>
+                <div class="task-form">
+                    <div class="form-group">
+                        <label for="task-input">Describe what you want to create:</label>
+                        <textarea 
+                            id="task-input" 
+                            placeholder="Example: Create a data analysis notebook with pandas, matplotlib, and seaborn. Include examples of data loading, cleaning, visualization, and statistical analysis."
+                            rows="4"
+                        ></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="filename-input">Notebook filename (optional):</label>
+                        <input 
+                            type="text" 
+                            id="filename-input" 
+                            placeholder="my_analysis_notebook.ipynb"
+                        >
+                    </div>
+                    <div class="form-actions">
+                        <button id="run-agent-btn" class="btn btn-primary">
+                            <i class="fas fa-play"></i> Run Agent
+                        </button>
+                        <button id="clear-task-btn" class="btn btn-secondary">
+                            <i class="fas fa-trash"></i> Clear
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Progress Section -->
+                <div id="progress-section" class="progress-section" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <div class="progress-text" id="progress-text">Initializing agent...</div>
+                </div>
+
+                <!-- Results Section -->
+                <div id="results-section" class="results-section" style="display: none;">
+                    <h3><i class="fas fa-chart-line"></i> Agent Results</h3>
+                    <div id="results-content"></div>
+                </div>
+            </section>
+
+            <!-- Notebooks Gallery -->
+            <section class="card notebooks-section">
+                <h2><i class="fas fa-book"></i> Saved Notebooks</h2>
+                <div class="notebooks-controls">
+                    <button id="refresh-notebooks-btn" class="btn btn-secondary">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                </div>
+                <div id="notebooks-grid" class="notebooks-grid">
+                    <!-- Notebooks will be loaded here -->
+                </div>
+            </section>
+
+            <!-- Quick Actions -->
+            <section class="card quick-actions">
+                <h2><i class="fas fa-bolt"></i> Quick Actions</h2>
+                <div class="actions-grid">
+                    <button class="action-btn" data-task="Create a machine learning notebook with scikit-learn examples including classification and regression">
+                        <i class="fas fa-brain"></i>
+                        <span>ML Examples</span>
+                    </button>
+                    <button class="action-btn" data-task="Create a data visualization notebook with matplotlib, seaborn, and plotly examples">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>Data Viz</span>
+                    </button>
+                    <button class="action-btn" data-task="Create a web scraping notebook with requests and BeautifulSoup examples">
+                        <i class="fas fa-spider"></i>
+                        <span>Web Scraping</span>
+                    </button>
+                    <button class="action-btn" data-task="Create a pandas tutorial notebook with data manipulation and analysis examples">
+                        <i class="fas fa-table"></i>
+                        <span>Pandas Tutorial</span>
+                    </button>
+                    <button class="action-btn" data-task="Create a statistics notebook with scipy and numpy examples">
+                        <i class="fas fa-calculator"></i>
+                        <span>Statistics</span>
+                    </button>
+                    <button class="action-btn" data-task="Create a deep learning notebook with TensorFlow/Keras examples">
+                        <i class="fas fa-network-wired"></i>
+                        <span>Deep Learning</span>
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>&copy; 2024 MCP Notebook Agent. Powered by AI and MCP Protocol.</p>
+        </footer>
+    </div>
+
+    <!-- Loading Modal -->
+    <div id="loading-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="spinner"></div>
+            <p>Agent is working...</p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
