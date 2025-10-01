@@ -47,3 +47,29 @@ class ChatMessage(BaseModel):
 class ChatResponse(BaseModel):
     """Chat response model"""
     response: str
+
+
+class AgentTaskRequest(BaseModel):
+    """Request model for agent task execution"""
+    task: str
+    save_notebook: bool = True
+    notebook_filename: Optional[str] = None
+
+
+class AgentTaskResponse(BaseModel):
+    """Response model for agent task execution"""
+    success: bool
+    task: str
+    outputs: List[str]
+    attempts: int
+    notebook_data: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+
+class NotebookDownloadResponse(BaseModel):
+    """Response model for notebook download"""
+    success: bool
+    filename: str
+    content: Optional[Dict[str, Any]] = None
+    download_url: Optional[str] = None
+    error: Optional[str] = None

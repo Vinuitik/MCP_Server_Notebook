@@ -110,20 +110,19 @@ class MCPService:
         """List all saved notebooks"""
         return await self.call_mcp_tool("listSavedNotebooks", {})
     
-    async def save_notebook(self, name: str, content: Dict[str, Any]) -> Any:
+    async def save_notebook(self, filename: str, content: Dict[str, Any] = None) -> Any:
         """Save a notebook"""
         return await self.call_mcp_tool("saveNotebook", {
-            "name": name,
-            "content": content
+            "filename": filename
         })
     
-    async def load_notebook(self, name: str) -> Any:
+    async def load_notebook(self, filepath: str) -> Any:
         """Load a notebook"""
-        return await self.call_mcp_tool("loadNotebook", {"name": name})
+        return await self.call_mcp_tool("loadNotebook", {"filepath": filepath})
     
-    async def delete_notebook(self, name: str) -> Any:
+    async def delete_notebook(self, filename: str) -> Any:
         """Delete a notebook"""
-        return await self.call_mcp_tool("deleteNotebook", {"name": name})
+        return await self.call_mcp_tool("deleteNotebook", {"filename": filename})
     
     def is_initialized(self) -> bool:
         """Check if service is initialized"""

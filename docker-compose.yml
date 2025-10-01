@@ -14,21 +14,6 @@ services:
     volumes:
       - notebook-storage:/app/notebooks
 
-  chatbot-web:
-    build:
-      context: ./webContainer
-      dockerfile: Dockerfile
-    container_name: mcp-notebook-web
-    ports:
-      - "9003:3000"
-    networks:
-      - app-network
-    depends_on:
-      - mcp-server
-      - notebook-agent 
-    environment:
-      - DOCKER_BUILDKIT=1
-
   notebook-agent:
     build:
       context: ./agentContainer
@@ -42,6 +27,23 @@ services:
       - mcp-server
     environment:
       - MCP_SERVER_URL=http://mcp-server:8002
+      - DOCKER_BUILDKIT=1
+    volumes:
+      - notebook-storage:/app/notebooks
+
+  nginx-frontend:
+    build:
+      context: ./nginxContainer
+      dockerfile: Dockerfile
+    container_name: mcp-nginx-frontend
+    ports:
+      - "9004:80"
+    networks:
+      - app-network
+    depends_on:
+      - mcp-server
+      - notebook-agent
+    environment:
       - DOCKER_BUILDKIT=1
 
 networks:
