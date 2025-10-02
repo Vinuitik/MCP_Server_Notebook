@@ -74,7 +74,27 @@ class MCPService:
         # Test connection and get available tools
         async with self.mcp_client:
             tools = await self.mcp_client.list_tools()
-            self.available_tools = [tool.name for tool in tools]
+            print(f"🔧 Debug - tools type: {type(tools)}")
+            print(f"🔧 Debug - tools content: {tools}")
+            
+            # Safely extract tool names
+            self.available_tools = []
+            if hasattr(tools, 'tools'):
+                # If tools is a response object with a tools attribute
+                tool_list = tools.tools
+            else:
+                # If tools is already a list
+                tool_list = tools
+                
+            for tool in tool_list:
+                print(f"🔧 Debug - tool type: {type(tool)}, tool: {tool}")
+                if hasattr(tool, 'name'):
+                    self.available_tools.append(tool.name)
+                elif isinstance(tool, dict) and 'name' in tool:
+                    self.available_tools.append(tool['name'])
+                else:
+                    print(f"⚠️ Warning - unexpected tool format: {tool}")
+                    self.available_tools.append(str(tool))
             
         self._connected = True
         print(f"✅ Connected to MCP server. Available tools: {self.available_tools}")

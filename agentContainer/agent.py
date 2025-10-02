@@ -35,7 +35,7 @@ def get_model():
             print(f"✅ Google credentials loaded from: {credentials_path}")
             
             # Get model name from environment or use default
-            model_name = os.getenv('GEMINI_MODEL', 'gemini-1.5-pro')
+            model_name = os.getenv('GEMINI_MODEL', 'gemini-2.5')
             print(f"🤖 Using Gemini model: {model_name}")
             
             # Initialize the model
