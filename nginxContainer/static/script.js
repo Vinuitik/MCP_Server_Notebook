@@ -155,6 +155,14 @@ async function runAgentTask() {
             body: JSON.stringify(requestData)
         });
         
+        console.log('📡 Response status:', response.status, response.statusText);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ API Error Response:', errorText);
+            throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+        }
+        
         const result = await response.json();
         console.log('📋 Agent result:', result);
         
@@ -258,15 +266,59 @@ async function loadNotebooks() {
         elements.refreshNotebooksBtn.disabled = true;
         elements.refreshNotebooksBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
         
+        console.log('🔄 Fetching notebooks from:', ENDPOINTS.notebooks);
         const response = await fetch(ENDPOINTS.notebooks);
-        const data = await response.json();
         
-        console.log('📚 Notebooks loaded:', data);
-        displayNotebooks(data.notebooks || []);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('📚 Raw notebooks response:', data);
+        
+        // Handle different response formats
+        let notebooksList = [];
+        
+        if (data && typeof data === 'object') {
+            // If data has a notebooks property
+            if (data.notebooks) {
+                if (Array.isArray(data.notebooks)) {
+                    notebooksList = data.notebooks;
+                } else if (typeof data.notebooks === 'object') {
+                    // If notebooks is an object, try to extract values or keys
+                    notebooksList = Object.keys(data.notebooks);
+                    console.log('� Converted notebooks object to array:', notebooksList);
+                } else {
+                    console.warn('⚠️ Notebooks property is not an array or object:', typeof data.notebooks);
+                }
+            } else if (Array.isArray(data)) {
+                // If the entire response is an array
+                notebooksList = data;
+            } else {
+                // Try to extract from other possible properties
+                notebooksList = data.files || data.items || [];
+                console.log('📝 Extracted from alternative properties:', notebooksList);
+            }
+        }
+        
+        console.log('📚 Final notebooks list:', notebooksList);
+        displayNotebooks(notebooksList);
         
     } catch (error) {
         console.error('❌ Failed to load notebooks:', error);
-        elements.notebooksGrid.innerHTML = '<p class="text-error">Failed to load notebooks</p>';
+        console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            endpoint: ENDPOINTS.notebooks
+        });
+        
+        elements.notebooksGrid.innerHTML = `
+            <div class="notebook-card">
+                <h4><i class="fas fa-exclamation-triangle"></i> Failed to Load Notebooks</h4>
+                <p class="text-error">Error: ${error.message}</p>
+                <p><small>Check the console for more details</small></p>
+            </div>
+        `;
     } finally {
         elements.refreshNotebooksBtn.disabled = false;
         elements.refreshNotebooksBtn.innerHTML = '<i class="fas fa-sync"></i> Refresh';
@@ -274,32 +326,84 @@ async function loadNotebooks() {
 }
 
 function displayNotebooks(notebooks) {
-    if (!notebooks || notebooks.length === 0) {
+    console.log('🖥️ Displaying notebooks:', notebooks, 'Type:', typeof notebooks);
+    
+    // Ensure notebooks is an array
+    let notebookArray = [];
+    
+    if (Array.isArray(notebooks)) {
+        notebookArray = notebooks;
+    } else if (notebooks && typeof notebooks === 'object') {
+        // If it's an object, try to convert to array
+        notebookArray = Object.keys(notebooks);
+        console.log('📝 Converted object to array:', notebookArray);
+    } else if (typeof notebooks === 'string') {
+        // If it's a string, try to parse as JSON
+        try {
+            const parsed = JSON.parse(notebooks);
+            notebookArray = Array.isArray(parsed) ? parsed : [notebooks];
+        } catch {
+            notebookArray = [notebooks];
+        }
+    } else {
+        console.warn('⚠️ Unexpected notebooks format:', notebooks);
+        notebookArray = [];
+    }
+    
+    // Filter out empty or invalid entries
+    notebookArray = notebookArray.filter(notebook => 
+        notebook && 
+        typeof notebook === 'string' && 
+        notebook.trim().length > 0
+    );
+    
+    console.log('📚 Final notebook array for display:', notebookArray);
+    
+    if (!notebookArray || notebookArray.length === 0) {
         elements.notebooksGrid.innerHTML = `
             <div class="notebook-card">
                 <h4><i class="fas fa-info-circle"></i> No Notebooks Yet</h4>
                 <p>Create your first notebook using the AI agent above!</p>
+                <p><small>Checked for: ${Array.isArray(notebooks) ? 'array' : typeof notebooks}</small></p>
             </div>
         `;
         return;
     }
     
-    const notebooksHtml = notebooks.map(notebook => `
-        <div class="notebook-card">
-            <h4><i class="fas fa-book"></i> ${notebook}</h4>
-            <p>Created: ${new Date().toLocaleDateString()}</p>
-            <div class="notebook-actions">
-                <a href="${ENDPOINTS.agentDownload}/${notebook}" class="btn btn-primary" download>
-                    <i class="fas fa-download"></i> Download
-                </a>
-                <button class="btn btn-secondary" onclick="deleteNotebook('${notebook}')">
-                    <i class="fas fa-trash"></i> Delete
-                </button>
+    try {
+        const notebooksHtml = notebookArray.map((notebook, index) => {
+            // Ensure notebook is a string
+            const notebookName = String(notebook).trim();
+            
+            return `
+                <div class="notebook-card">
+                    <h4><i class="fas fa-book"></i> ${notebookName}</h4>
+                    <p>Created: ${new Date().toLocaleDateString()}</p>
+                    <div class="notebook-actions">
+                        <a href="${ENDPOINTS.agentDownload}/${encodeURIComponent(notebookName)}" class="btn btn-primary" download>
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                        <button class="btn btn-secondary" onclick="deleteNotebook('${notebookName.replace(/'/g, "\\'")}')">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        elements.notebooksGrid.innerHTML = notebooksHtml;
+        console.log('✅ Successfully displayed', notebookArray.length, 'notebooks');
+        
+    } catch (error) {
+        console.error('❌ Error in displayNotebooks:', error);
+        elements.notebooksGrid.innerHTML = `
+            <div class="notebook-card">
+                <h4><i class="fas fa-exclamation-triangle"></i> Display Error</h4>
+                <p class="text-error">Failed to display notebooks: ${error.message}</p>
+                <p><small>Data received: ${JSON.stringify(notebooks).substring(0, 100)}...</small></p>
             </div>
-        </div>
-    `).join('');
-    
-    elements.notebooksGrid.innerHTML = notebooksHtml;
+        `;
+    }
 }
 
 async function deleteNotebook(filename) {
@@ -435,5 +539,37 @@ window.MCPDashboard = {
     runAgentTask,
     loadNotebooks,
     checkSystemStatus,
-    deleteNotebook
+    deleteNotebook,
+    // Debug function to test notebooks endpoint
+    async debugNotebooks() {
+        console.log('🔍 Debug: Testing notebooks endpoint...');
+        try {
+            const response = await fetch(ENDPOINTS.notebooks);
+            console.log('🔍 Response status:', response.status, response.statusText);
+            console.log('🔍 Response headers:', Object.fromEntries(response.headers.entries()));
+            
+            const text = await response.text();
+            console.log('🔍 Raw response text:', text);
+            
+            try {
+                const data = JSON.parse(text);
+                console.log('🔍 Parsed JSON:', data);
+                console.log('🔍 data.notebooks type:', typeof data.notebooks);
+                console.log('🔍 data.notebooks:', data.notebooks);
+                
+                if (data.notebooks && typeof data.notebooks === 'object') {
+                    console.log('🔍 data.notebooks keys:', Object.keys(data.notebooks));
+                    if (data.notebooks.notebooks) {
+                        console.log('🔍 data.notebooks.notebooks:', data.notebooks.notebooks);
+                        console.log('🔍 data.notebooks.notebooks type:', typeof data.notebooks.notebooks);
+                    }
+                }
+            } catch (parseError) {
+                console.error('🔍 JSON parse error:', parseError);
+            }
+            
+        } catch (error) {
+            console.error('🔍 Debug fetch error:', error);
+        }
+    }
 };
