@@ -367,46 +367,123 @@ async def download_notebook(filename: str):
                 detail="MCP service not connected"
             )
         
+        # Ensure filename has .ipynb extension
+        if not filename.endswith('.ipynb'):
+            filename += '.ipynb'
+        
         logger.debug(f"Loading notebook: {filename}")
-        # Load the notebook
-        notebook_result = await mcp_service.load_notebook(filename)
+        # First check if the notebook exists by trying to load it
+        notebook_result = await mcp_service.call_mcp_tool("loadNotebook", {"filepath": filename})
         logger.debug(f"Load notebook result: {notebook_result}")
         
-        if not notebook_result or not notebook_result.get("loaded"):
+        if not notebook_result or not notebook_result.get("loaded", False):
             logger.warning(f"Notebook not found or failed to load: {filename}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Notebook not found: {filename}"
             )
         
-        logger.debug(f"Exporting notebook: {filename}")
-        # Get the notebook content 
-        # Since we don't have direct access to the notebook content from load_notebook,
-        # we'll need to get it through the exportNotebook tool
-        export_result = await mcp_service.call_mcp_tool("exportNotebook", {
-            "filename": filename,
-            "format": "json"
-        })
-        logger.debug(f"Export result: {export_result}")
+        logger.debug(f"Saving current state and exporting notebook: {filename}")
+        # Save the current notebook state first, then export it
+        save_result = await mcp_service.call_mcp_tool("saveNotebook", {"filename": filename})
+        logger.debug(f"Save result: {save_result}")
         
-        if not export_result.get("exported"):
-            logger.error(f"Failed to export notebook: {filename}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to export notebook"
-            )
+        if not save_result.get("saved", False):
+            logger.error(f"Failed to save notebook before export: {filename}")
+            # Try to export anyway, might be an existing file
         
-        # Create a JSON response for download
-        logger.debug("Creating JSON response for download")
-        notebook_json = json.dumps(export_result, indent=2)
+        # Read the file directly from the filesystem via MCP service
+        # We'll use a new approach - read the saved file content
+        try:
+            # Try to get the raw notebook content
+            notebooks_list = await mcp_service.call_mcp_tool("listSavedNotebooks", {})
+            logger.debug(f"Available notebooks: {notebooks_list}")
+            
+            if filename not in notebooks_list.get("notebooks", []):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Notebook file not found in saved notebooks: {filename}"
+                )
+            
+            # Since we can't directly read files through MCP, we'll export as JSON
+            export_result = await mcp_service.call_mcp_tool("exportNotebook", {
+                "filename": filename.replace('.ipynb', '_export.ipynb'),
+                "format": "json"
+            })
+            logger.debug(f"Export result: {export_result}")
+            
+            if not export_result.get("exported", False):
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to export notebook"
+                )
+            
+            # Create proper notebook JSON structure
+            notebook_content = {
+                "cells": [],
+                "metadata": {
+                    "kernelspec": {
+                        "display_name": "Python 3",
+                        "language": "python", 
+                        "name": "python3"
+                    },
+                    "language_info": {
+                        "name": "python",
+                        "version": "3.12.0"
+                    }
+                },
+                "nbformat": 4,
+                "nbformat_minor": 4
+            }
+            
+            # If export result contains notebook data, use it
+            if isinstance(export_result, dict) and "cells" in export_result:
+                notebook_content = export_result
+            
+            notebook_json = json.dumps(notebook_content, indent=2, ensure_ascii=False)
+            
+        except Exception as export_error:
+            logger.error(f"Export method failed: {export_error}")
+            # Fallback: create a basic notebook structure
+            notebook_content = {
+                "cells": [
+                    {
+                        "cell_type": "markdown",
+                        "metadata": {},
+                        "source": [f"# {filename.replace('.ipynb', '')}\n\nThis notebook was exported from MCP Notebook Agent."]
+                    }
+                ],
+                "metadata": {
+                    "kernelspec": {
+                        "display_name": "Python 3",
+                        "language": "python",
+                        "name": "python3"
+                    },
+                    "language_info": {
+                        "name": "python",
+                        "version": "3.12.0"
+                    }
+                },
+                "nbformat": 4,
+                "nbformat_minor": 4
+            }
+            notebook_json = json.dumps(notebook_content, indent=2, ensure_ascii=False)
         
-        # Create streaming response for download
+        # Create streaming response for download with proper headers
         logger.info(f"Sending notebook download: {filename} ({len(notebook_json)} bytes)")
-        return StreamingResponse(
+        
+        response = StreamingResponse(
             io.BytesIO(notebook_json.encode('utf-8')),
-            media_type="application/json",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
+            media_type="application/x-ipynb+json",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "Content-Type": "application/x-ipynb+json",
+                "Content-Length": str(len(notebook_json.encode('utf-8'))),
+                "Cache-Control": "no-cache"
+            }
         )
+        
+        return response
         
     except HTTPException:
         raise

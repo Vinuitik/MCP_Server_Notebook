@@ -234,9 +234,9 @@ function displayResults(result, filename) {
     if (success && filename) {
         html += `
             <div class="mt-20">
-                <a href="${ENDPOINTS.agentDownload}/${filename}" class="download-btn" download>
+                <button class="btn btn-primary download-btn" onclick="downloadNotebook('${filename.replace(/'/g, "\\'")}')">
                     <i class="fas fa-download"></i> Download Notebook
-                </a>
+                </button>
             </div>
         `;
     }
@@ -380,9 +380,9 @@ function displayNotebooks(notebooks) {
                     <h4><i class="fas fa-book"></i> ${notebookName}</h4>
                     <p>Created: ${new Date().toLocaleDateString()}</p>
                     <div class="notebook-actions">
-                        <a href="${ENDPOINTS.agentDownload}/${encodeURIComponent(notebookName)}" class="btn btn-primary" download>
+                        <button class="btn btn-primary" onclick="downloadNotebook('${notebookName.replace(/'/g, "\\'")}')">
                             <i class="fas fa-download"></i> Download
-                        </a>
+                        </button>
                         <button class="btn btn-secondary" onclick="deleteNotebook('${notebookName.replace(/'/g, "\\'")}')">
                             <i class="fas fa-trash"></i> Delete
                         </button>
@@ -403,6 +403,44 @@ function displayNotebooks(notebooks) {
                 <p><small>Data received: ${JSON.stringify(notebooks).substring(0, 100)}...</small></p>
             </div>
         `;
+    }
+}
+
+async function downloadNotebook(filename) {
+    try {
+        console.log(`📥 Starting download for: ${filename}`);
+        showNotification(`Downloading ${filename}...`, 'info');
+        
+        // Fetch the notebook file
+        const response = await fetch(`${ENDPOINTS.agentDownload}/${encodeURIComponent(filename)}`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        // Get the file as a blob
+        const blob = await response.blob();
+        
+        // Create a download link and trigger it
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        
+        // Add to DOM temporarily and click
+        document.body.appendChild(link);
+        link.click();
+        
+        // Clean up
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        console.log(`✅ Download completed: ${filename}`);
+        showNotification(`Downloaded ${filename} successfully!`, 'success');
+        
+    } catch (error) {
+        console.error(`❌ Download failed for ${filename}:`, error);
+        showNotification(`Failed to download ${filename}: ${error.message}`, 'error');
     }
 }
 
@@ -540,6 +578,7 @@ window.MCPDashboard = {
     loadNotebooks,
     checkSystemStatus,
     deleteNotebook,
+    downloadNotebook,
     // Debug function to test notebooks endpoint
     async debugNotebooks() {
         console.log('🔍 Debug: Testing notebooks endpoint...');
