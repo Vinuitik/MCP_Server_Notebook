@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 from services.mcp_service import MCPService
 from controllers.agent_controller import router as agent_router, set_mcp_service
+from controllers.testing_controller import router as testing_router, set_mcp_service as set_testing_mcp_service
 
 # Load environment variables
 load_dotenv()
@@ -30,8 +31,9 @@ async def lifespan(app: FastAPI):
         print("❌ Failed to initialize MCP service")
         sys.exit(1)
     
-    # Inject service into controller
+    # Inject service into controllers
     set_mcp_service(mcp_service)
+    set_testing_mcp_service(mcp_service)
     
     print("✅ MCP Agent is ready!")
     
@@ -51,6 +53,7 @@ app = FastAPI(
 
 # Include routers
 app.include_router(agent_router, prefix="/api/v1", tags=["agent"])
+app.include_router(testing_router, prefix="/api/v1/testing", tags=["testing"])
 
 
 @app.get("/")

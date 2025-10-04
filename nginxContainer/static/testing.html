@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Testing Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Additional styles for testing page */
+        .test-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            border-left: 5px solid #667eea;
+        }
+        
+        .test-result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .test-result.success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .test-result.error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .test-result.info {
+            background-color: #cce7ff;
+            border: 1px solid #99d3ff;
+            color: #004085;
+        }
+        
+        .test-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .test-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .test-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .download-button {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+        
+        .download-button:hover {
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        
+        .status-badge.online {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status-badge.offline {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .json-viewer {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+        }
+        
+        .test-info {
+            background: rgba(102, 126, 234, 0.1);
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 0 8px 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1><i class="fas fa-flask"></i> MCP Testing Dashboard</h1>
+                <p>Test MCP functionality and download sample notebooks</p>
+            </div>
+            <div class="status-indicators">
+                <div class="status-item" id="agent-status">
+                    <i class="fas fa-circle"></i>
+                    <span>Agent: <span id="agent-status-text">Checking...</span></span>
+                </div>
+                <div class="status-item" id="mcp-status">
+                    <i class="fas fa-circle"></i>
+                    <span>MCP: <span id="mcp-status-text">Checking...</span></span>
+                </div>
+                <div class="status-item" id="testing-status">
+                    <i class="fas fa-circle"></i>
+                    <span>Testing: <span id="testing-status-text">Checking...</span></span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav style="margin-bottom: 30px;">
+            <a href="index.html" style="color: white; text-decoration: none; margin-right: 20px;">
+                <i class="fas fa-home"></i> Main Dashboard
+            </a>
+            <a href="download_test.html" style="color: white; text-decoration: none; margin-right: 20px;">
+                <i class="fas fa-download"></i> Download Test
+            </a>
+            <span style="color: white; font-weight: bold;">
+                <i class="fas fa-flask"></i> Testing Dashboard
+            </span>
+        </nav>
+
+        <!-- Info Section -->
+        <div class="test-info">
+            <h3><i class="fas fa-info-circle"></i> About Testing Controller</h3>
+            <p>This page tests the new testing controller endpoints that demonstrate MCP functionality by creating notebooks with markdown and code cells, saving them, and providing downloadable files.</p>
+        </div>
+
+        <!-- Test Notebook Creation -->
+        <div class="test-card">
+            <h2><i class="fas fa-file-code"></i> Test Notebook Creation</h2>
+            <p>Create a sample notebook with markdown and code cells, then download it as a .ipynb file.</p>
+            
+            <div style="margin: 20px 0;">
+                <button class="test-button download-button" onclick="createTestNotebook()">
+                    <i class="fas fa-plus-circle"></i>
+                    Create & Download Test Notebook
+                </button>
+                <span id="notebook-status"></span>
+            </div>
+            
+            <div id="notebook-result" class="test-result" style="display: none;"></div>
+        </div>
+
+        <!-- MCP Tools Testing -->
+        <div class="test-card">
+            <h2><i class="fas fa-tools"></i> MCP Tools Testing</h2>
+            <p>Test various MCP tools to verify connectivity and functionality.</p>
+            
+            <div style="margin: 20px 0;">
+                <button class="test-button" onclick="testMCPTools()">
+                    <i class="fas fa-cogs"></i>
+                    Run MCP Tools Test
+                </button>
+                <span id="tools-status"></span>
+            </div>
+            
+            <div id="tools-result" class="test-result" style="display: none;"></div>
+        </div>
+
+        <!-- Health Checks -->
+        <div class="test-card">
+            <h2><i class="fas fa-heartbeat"></i> Health Checks</h2>
+            <p>Check the health status of all system components.</p>
+            
+            <div style="margin: 20px 0;">
+                <button class="test-button" onclick="checkMainHealth()">
+                    <i class="fas fa-heart"></i>
+                    Main Agent Health
+                </button>
+                <button class="test-button" onclick="checkTestingHealth()">
+                    <i class="fas fa-flask"></i>
+                    Testing Controller Health
+                </button>
+                <button class="test-button" onclick="checkAgentStatus()">
+                    <i class="fas fa-info-circle"></i>
+                    Detailed Status
+                </button>
+                <span id="health-status"></span>
+            </div>
+            
+            <div id="health-result" class="test-result" style="display: none;"></div>
+        </div>
+
+        <!-- Manual API Testing -->
+        <div class="test-card">
+            <h2><i class="fas fa-code"></i> Manual API Testing</h2>
+            <p>Direct API endpoint URLs for manual testing:</p>
+            
+            <div style="margin: 20px 0;">
+                <div style="margin-bottom: 10px;">
+                    <strong>Test Notebook Creation:</strong><br>
+                    <code id="notebook-url">GET http://localhost/api/v1/testing/test-notebook</code>
+                    <button onclick="copyToClipboard('notebook-url')" style="margin-left: 10px; padding: 2px 8px; border: none; background: #667eea; color: white; border-radius: 3px; cursor: pointer;">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+                
+                <div style="margin-bottom: 10px;">
+                    <strong>MCP Tools Test:</strong><br>
+                    <code id="tools-url">GET http://localhost/api/v1/testing/test-mcp-tools</code>
+                    <button onclick="copyToClipboard('tools-url')" style="margin-left: 10px; padding: 2px 8px; border: none; background: #667eea; color: white; border-radius: 3px; cursor: pointer;">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+                
+                <div style="margin-bottom: 10px;">
+                    <strong>Testing Health:</strong><br>
+                    <code id="health-url">GET http://localhost/api/v1/testing/health</code>
+                    <button onclick="copyToClipboard('health-url')" style="margin-left: 10px; padding: 2px 8px; border: none; background: #667eea; color: white; border-radius: 3px; cursor: pointer;">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Base API URL
+        const API_BASE = '/api/v1';
+        const TESTING_BASE = `${API_BASE}/testing`;
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAllStatus();
+        });
+
+        // Status checking functions
+        async function checkAllStatus() {
+            await Promise.all([
+                checkMainHealth(),
+                checkTestingHealth(),
+                checkAgentStatus()
+            ]);
+        }
+
+        async function checkMainHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                updateStatusIndicator('agent-status', data.status === 'healthy', data.status);
+                updateStatusIndicator('mcp-status', data.mcp_connected, data.mcp_connected ? 'connected' : 'disconnected');
+                
+                if (document.getElementById('health-result').style.display !== 'none') {
+                    showResult('health-result', data, 'success');
+                }
+            } catch (error) {
+                updateStatusIndicator('agent-status', false, 'error');
+                updateStatusIndicator('mcp-status', false, 'error');
+                if (document.getElementById('health-result').style.display !== 'none') {
+                    showResult('health-result', `Error: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        async function checkTestingHealth() {
+            try {
+                const response = await fetch(`${TESTING_BASE}/health`);
+                const data = await response.json();
+                
+                updateStatusIndicator('testing-status', data.status === 'healthy', data.status);
+                
+                if (document.getElementById('health-result').style.display !== 'none') {
+                    showResult('health-result', data, 'success');
+                }
+            } catch (error) {
+                updateStatusIndicator('testing-status', false, 'error');
+                if (document.getElementById('health-result').style.display !== 'none') {
+                    showResult('health-result', `Testing Controller Error: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        async function checkAgentStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/status`);
+                const data = await response.json();
+                
+                if (document.getElementById('health-result').style.display !== 'none') {
+                    showResult('health-result', data, 'info');
+                }
+            } catch (error) {
+                if (document.getElementById('health-result').style.display !== 'none') {
+                    showResult('health-result', `Status Error: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        // Test notebook creation
+        async function createTestNotebook() {
+            const button = event.target;
+            const originalText = button.innerHTML;
+            
+            button.disabled = true;
+            button.innerHTML = '<div class="loading"></div> Creating notebook...';
+            document.getElementById('notebook-status').innerHTML = '<span class="loading"></span> Creating...';
+            
+            try {
+                const response = await fetch(`${TESTING_BASE}/test-notebook`);
+                
+                if (response.ok) {
+                    // Get filename from response headers
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    const filename = contentDisposition ? 
+                        contentDisposition.split('filename=')[1] : 
+                        'test_notebook.ipynb';
+                    
+                    // Create blob and download
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    showResult('notebook-result', `✅ Notebook created and downloaded successfully!\nFilename: ${filename}\nSize: ${(blob.size / 1024).toFixed(2)} KB`, 'success');
+                    document.getElementById('notebook-status').innerHTML = '<span class="status-badge online">Success</span>';
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Failed to create notebook');
+                }
+            } catch (error) {
+                showResult('notebook-result', `❌ Error creating notebook:\n${error.message}`, 'error');
+                document.getElementById('notebook-status').innerHTML = '<span class="status-badge offline">Failed</span>';
+            } finally {
+                button.disabled = false;
+                button.innerHTML = originalText;
+            }
+        }
+
+        // Test MCP tools
+        async function testMCPTools() {
+            const button = event.target;
+            const originalText = button.innerHTML;
+            
+            button.disabled = true;
+            button.innerHTML = '<div class="loading"></div> Testing tools...';
+            document.getElementById('tools-status').innerHTML = '<span class="loading"></span> Testing...';
+            
+            try {
+                const response = await fetch(`${TESTING_BASE}/test-mcp-tools`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('tools-result', data, data.success ? 'success' : 'error');
+                    document.getElementById('tools-status').innerHTML = 
+                        `<span class="status-badge ${data.success ? 'online' : 'offline'}">
+                            ${data.summary.successful_tests}/${data.summary.total_tests} passed
+                        </span>`;
+                } else {
+                    throw new Error(data.detail || 'Failed to test MCP tools');
+                }
+            } catch (error) {
+                showResult('tools-result', `❌ Error testing MCP tools:\n${error.message}`, 'error');
+                document.getElementById('tools-status').innerHTML = '<span class="status-badge offline">Failed</span>';
+            } finally {
+                button.disabled = false;
+                button.innerHTML = originalText;
+            }
+        }
+
+        // Utility functions
+        function updateStatusIndicator(elementId, isOnline, statusText) {
+            const element = document.getElementById(elementId);
+            const circle = element.querySelector('.fas.fa-circle');
+            const textElement = element.querySelector('span span');
+            
+            circle.style.color = isOnline ? '#28a745' : '#dc3545';
+            textElement.textContent = statusText;
+        }
+
+        function showResult(elementId, data, type) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = `test-result ${type}`;
+            
+            if (typeof data === 'object') {
+                element.textContent = JSON.stringify(data, null, 2);
+            } else {
+                element.textContent = data;
+            }
+        }
+
+        function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            const text = element.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                // Show temporary feedback
+                const button = event.target;
+                const originalText = button.innerHTML;
+                button.innerHTML = '<i class="fas fa-check"></i>';
+                button.style.background = '#28a745';
+                
+                setTimeout(() => {
+                    button.innerHTML = originalText;
+                    button.style.background = '#667eea';
+                }, 1000);
+            });
+        }
+
+        // Auto-refresh status every 30 seconds
+        setInterval(checkAllStatus, 30000);
+    </script>
+</body>
+</html>
