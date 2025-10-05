@@ -7,7 +7,7 @@ param(
     [string]$Action = "run",
     
     [Parameter(Position=1)]
-    [ValidateSet("gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.0-pro")]
+    [ValidateSet("claude-3-5-sonnet-20241022", "claude-3-opus-20240229", "claude-3-haiku-20240307")]
     [string]$Model = ""
 )
 
@@ -27,7 +27,7 @@ function Show-Help {
     Write-Host "  logs         - Show logs from all containers" -ForegroundColor White
     Write-Host "  clean        - Stop all containers and remove images" -ForegroundColor White
     Write-Host "  test-agent   - Test the agent API integration" -ForegroundColor White
-    Write-Host "  switch-model - Switch Gemini model (use with -Model parameter)" -ForegroundColor White
+    Write-Host "  switch-model - Switch Claude model (use with -Model parameter)" -ForegroundColor White
     Write-Host "  help         - Show this help message" -ForegroundColor White
     Write-Host ""
     Write-Host "Services:" -ForegroundColor Cyan
@@ -40,7 +40,7 @@ function Show-Help {
     Write-Host "  .\run-app.ps1                          # Build and run all services" -ForegroundColor Gray
     Write-Host "  .\run-app.ps1 build                    # Just build all images" -ForegroundColor Gray
     Write-Host "  .\run-app.ps1 logs                     # View logs from all services" -ForegroundColor Gray
-    Write-Host "  .\run-app.ps1 switch-model -Model gemini-1.5-flash  # Switch to faster model" -ForegroundColor Gray
+    Write-Host "  .\run-app.ps1 switch-model -Model claude-3-haiku-20240307  # Switch to faster model" -ForegroundColor Gray
 }
 
 function Test-DockerInstalled {
@@ -269,15 +269,15 @@ switch ($Action) {
     "switch-model" {
         if (-not $Model) {
             Write-Host "Please specify a model with -Model parameter:" -ForegroundColor Red
-            Write-Host "  gemini-1.5-pro   - Best quality, slower" -ForegroundColor Gray
-            Write-Host "  gemini-1.5-flash - Faster, good quality" -ForegroundColor Gray
-            Write-Host "  gemini-1.0-pro   - Stable, general purpose" -ForegroundColor Gray
+            Write-Host "  claude-3-5-sonnet-20241022 - Most capable, balanced" -ForegroundColor Gray
+            Write-Host "  claude-3-opus-20240229     - Most powerful, slower" -ForegroundColor Gray
+            Write-Host "  claude-3-haiku-20240307    - Fastest, most economical" -ForegroundColor Gray
             Write-Host ""
-            Write-Host "Example: .\run-app.ps1 switch-model -Model gemini-1.5-flash" -ForegroundColor Yellow
+            Write-Host "Example: .\run-app.ps1 switch-model -Model claude-3-haiku-20240307" -ForegroundColor Yellow
             exit 1
         }
         
-        Write-Host "Switching to Gemini model: $Model" -ForegroundColor Yellow
+        Write-Host "Switching to Claude model: $Model" -ForegroundColor Yellow
         
         # Update .env file
         $envPath = ".\agentContainer\.env"
@@ -287,8 +287,8 @@ switch ($Action) {
             $modelUpdated = $false
             
             foreach ($line in $envContent) {
-                if ($line -match "^GEMINI_MODEL=") {
-                    $newContent += "GEMINI_MODEL=$Model"
+                if ($line -match "^CLAUDE_MODEL=") {
+                    $newContent += "CLAUDE_MODEL=$Model"
                     $modelUpdated = $true
                 } else {
                     $newContent += $line
@@ -296,7 +296,7 @@ switch ($Action) {
             }
             
             if (-not $modelUpdated) {
-                $newContent += "GEMINI_MODEL=$Model"
+                $newContent += "CLAUDE_MODEL=$Model"
             }
             
             $newContent | Set-Content $envPath

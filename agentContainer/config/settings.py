@@ -22,18 +22,15 @@ class Settings:
         
         # LLM settings from config
         llm_config = self.config.get("llm", {})
-        self.llm_model = llm_config.get("model", "gemini-2.0-flash-exp")
+        self.llm_model = llm_config.get("model", "claude-3-5-sonnet-20241022")
         self.llm_temperature = llm_config.get("temperature", 0.7)
-        self.llm_max_tokens = llm_config.get("max_tokens", 2048)
+        self.llm_max_tokens = llm_config.get("max_tokens", 4096)
         self.llm_timeout = llm_config.get("timeout", 30)
         
-        # Google Cloud Service Account Configuration
-        self.google_credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-        self.project_id = os.getenv("PROJECT_ID")
-        if not self.google_credentials_path:
-            raise ValueError("GOOGLE_APPLICATION_CREDENTIALS is required")
-        if not self.project_id:
-            raise ValueError("PROJECT_ID is required")
+        # Anthropic API Configuration
+        self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not self.anthropic_api_key:
+            raise ValueError("ANTHROPIC_API_KEY is required")
         
         # MCP settings from config and environment
         mcp_config = self.config.get("mcp", {})

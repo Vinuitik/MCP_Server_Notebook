@@ -12,15 +12,12 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Copy the agent application and configuration
 COPY main.py .
 COPY agent.py .
-COPY test_imports.py .
-COPY test_models.py .
-COPY verify_credentials.py .
 COPY .env .
-COPY service-account-key.json .
 COPY models/ ./models/
 COPY services/ ./services/
 COPY controllers/ ./controllers/
 COPY config/ ./config/
+COPY prompts/ ./prompts/
 
 EXPOSE 8001
 

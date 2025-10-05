@@ -6,9 +6,10 @@ import logging
 import traceback
 from datetime import datetime
 from langgraph.graph import StateGraph, END
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_anthropic import ChatAnthropic
 import asyncio
 from dotenv import load_dotenv
+from prompts.prompt_manager import prompt_manager
 
 # Load environment variables
 load_dotenv()
@@ -17,57 +18,55 @@ load_dotenv()
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+# Initialize prompt manager and log available prompts
+try:
+    available_prompts = prompt_manager.list_available_prompts()
+    logger.info(f"Prompt manager initialized successfully. Available prompts: {available_prompts}")
+    logger.info(f"Prompt version: {prompt_manager.get_version()}")
+except Exception as e:
+    logger.error(f"Failed to initialize prompt manager: {e}")
+    logger.warning("Agent will attempt to continue but prompts may not load correctly")
+
 MAX_ATTEMPTS = 5
 
 # Initialize model lazily to avoid credential issues at import time
 _model = None
 
 def get_model():
-    """Get or create the ChatGoogleGenerativeAI model with proper credentials"""
+    """Get or create the ChatAnthropic model with proper credentials"""
     global _model
     if _model is None:
         try:
-            logger.info("Initializing ChatGoogleGenerativeAI model...")
+            logger.info("Initializing ChatAnthropic model...")
             
-            # Ensure credentials are available
-            credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-            logger.info(f"🔐 Looking for credentials at: {credentials_path}")
-            print(f"🔐 Looking for credentials at: {credentials_path}")
+            # Ensure API key is available
+            api_key = os.getenv('ANTHROPIC_API_KEY')
+            logger.info(f"🔐 Looking for API key: {'*' * (len(api_key) - 4) + api_key[-4:] if api_key else 'None'}")
+            print(f"🔐 Looking for API key: {'*' * (len(api_key) - 4) + api_key[-4:] if api_key else 'None'}")
             
-            if not credentials_path:
-                error_msg = "GOOGLE_APPLICATION_CREDENTIALS environment variable not set"
+            if not api_key:
+                error_msg = "ANTHROPIC_API_KEY environment variable not set"
                 logger.error(error_msg)
                 raise ValueError(error_msg)
-            
-            if not os.path.exists(credentials_path):
-                error_msg = f"Google credentials file not found at: {credentials_path}"
-                logger.error(error_msg)
-                raise ValueError(error_msg)
-            
-            # Set the environment variable for Google Auth
-            os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
-            logger.info(f"✅ Google credentials loaded from: {credentials_path}")
-            print(f"✅ Google credentials loaded from: {credentials_path}")
             
             # Get model name from environment or use default
-            model_name = os.getenv('GEMINI_MODEL', 'gemini-2.5')
-            logger.info(f"🤖 Using Gemini model: {model_name}")
-            print(f"🤖 Using Gemini model: {model_name}")
+            model_name = os.getenv('CLAUDE_MODEL', 'claude-3-5-sonnet-20241022')
+            logger.info(f"🤖 Using Claude model: {model_name}")
+            print(f"🤖 Using Claude model: {model_name}")
             
             # Initialize the model
-            logger.debug("Creating ChatGoogleGenerativeAI instance...")
-            _model = ChatGoogleGenerativeAI(
+            logger.debug("Creating ChatAnthropic instance...")
+            _model = ChatAnthropic(
                 model=model_name,
-                google_api_key=None,  # Use service account instead
-                convert_system_message_to_human=True,
+                anthropic_api_key=api_key,
                 temperature=0.7,  # Add some creativity
-                max_tokens=2048   # Reasonable token limit
+                max_tokens=4096   # Higher token limit for Claude
             )
-            logger.info(f"✅ ChatGoogleGenerativeAI model ({model_name}) initialized successfully")
-            print(f"✅ ChatGoogleGenerativeAI model ({model_name}) initialized successfully")
+            logger.info(f"✅ ChatAnthropic model ({model_name}) initialized successfully")
+            print(f"✅ ChatAnthropic model ({model_name}) initialized successfully")
             
         except Exception as e:
-            error_msg = f"❌ Failed to initialize ChatGoogleGenerativeAI: {e}"
+            error_msg = f"❌ Failed to initialize ChatAnthropic: {e}"
             logger.error(error_msg)
             logger.error(f"Traceback: {traceback.format_exc()}")
             print(error_msg)
@@ -98,14 +97,18 @@ async def entry(state):
         else:
             logger.warning("No MCP service available in state")
         
-        prompt = f"""Please refine the following task: {state['task']}
+        system_prompt = prompt_manager.get_entry_prompt()
+
+        prompt = f"""{system_prompt}
+
+CURRENT TASK: Please refine the following task: {state['task']}
 
 Previous outputs:
 {chr(10).join(state['outputs'])}
 
 Available MCP Tools: {', '.join(state.get('available_tools', []))}
 
-Provide a refined task description that makes use of the available notebook tools."""
+Provide a refined task description that makes use of the available notebook tools and follows the MCP stateful workflow."""
         
         logger.debug(f"Sending prompt to model: {prompt[:200]}...")
         response = await get_model().ainvoke(prompt)
@@ -132,9 +135,15 @@ async def refining(state):
             state["keep_refining"] = False
             return state
         else:
-            prompt = f"""Based on the task: {state['task']}
+            system_prompt = prompt_manager.get_refining_prompt()
 
-Do you need to keep refining the code to accomplish it? Answer yes or no. ONLY YES OR NO!"""
+            prompt = f"""{system_prompt}
+
+Do you need to keep refining the code to accomplish the task: {state['task']}
+
+Consider the MCP stateful workflow and whether you need to create more content, execute more operations, or if you're ready to save and finalize.
+
+Answer yes or no. ONLY YES OR NO!"""
             
             logger.debug(f"Sending refinement prompt to model")
             response = await get_model().ainvoke(prompt)
@@ -191,17 +200,17 @@ async def code_attempt(state):
     logger.info(f"Code attempt phase started (attempt {state['attempts'] + 1})")
     
     try:
-        prompt = f"""Based on the task: {state['task']}
+        system_prompt = prompt_manager.get_code_attempt_prompt()
+
+        prompt = f"""{system_prompt}
+
+CURRENT TASK: {state['task']}
 
 Available MCP Tools: {', '.join(state.get('available_tools', []))}
 
-Use the tools available to you to accomplish the task. You can:
-1. Create, execute, and manage notebook cells
-2. Save and load notebooks  
-3. Work with code and markdown cells
-4. Export notebooks in different formats
-
-Be systematic and check if each step runs properly. Order matters for execution.
+Use the tools available to accomplish the task following the MCP stateful workflow.
+Be systematic and check if each step runs properly. 
+Remember to save your work using 'saveNotebook' when complete.
 
 Provide specific tool calls and code that should be executed."""
 

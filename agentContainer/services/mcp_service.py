@@ -4,8 +4,7 @@ MCP Service - Handles all MCP server interactions
 import os
 import asyncio
 from typing import Dict, Any, List, Optional
-from google.oauth2 import service_account
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_anthropic import ChatAnthropic
 from fastmcp import Client
 from fastmcp.client.transports import StreamableHttpTransport
 
@@ -14,24 +13,20 @@ class MCPService:
     """Service for managing MCP server connections and operations"""
     
     def __init__(self):
-        self.credentials: Optional[service_account.Credentials] = None
-        self.llm: Optional[ChatGoogleGenerativeAI] = None
+        self.llm: Optional[ChatAnthropic] = None
         self.mcp_client: Optional[Client] = None
         self.available_tools: List[str] = []
         self._initialized = False
         self._connected = False
         
         # Environment variables
-        self.google_credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-        self.project_id = os.getenv("PROJECT_ID")
-        self.mcp_server_url = os.getenv("MCP_SERVER_URL")
+        self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+        self.claude_model = os.getenv("CLAUDE_MODEL", "claude-3-5-sonnet-20241022")
+        self.mcp_server_url = os.getenv("MCP_SERVER_URL", "http://localhost:8002")
         
     async def initialize(self) -> bool:
         """Initialize the MCP service"""
         try:
-            print("🔐 Loading Google Cloud credentials...")
-            self._load_google_credentials()
-            
             print("🔌 Connecting to MCP server...")
             await self._connect_to_mcp_server()
             
@@ -45,20 +40,6 @@ class MCPService:
         except Exception as e:
             print(f"❌ Failed to initialize MCP service: {e}")
             return False
-    
-    def _load_google_credentials(self):
-        """Load Google Cloud service account credentials"""
-        if not self.google_credentials_path:
-            raise ValueError("GOOGLE_APPLICATION_CREDENTIALS environment variable is required")
-            
-        if not os.path.exists(self.google_credentials_path):
-            raise FileNotFoundError(f"Service account key file not found: {self.google_credentials_path}")
-            
-        self.credentials = service_account.Credentials.from_service_account_file(
-            self.google_credentials_path,
-            scopes=['https://www.googleapis.com/auth/cloud-platform']
-        )
-        print(f"✅ Loaded credentials for: {self.credentials.service_account_email}")
     
     async def _connect_to_mcp_server(self):
         """Connect to the MCP server"""
@@ -101,18 +82,16 @@ class MCPService:
     
     def _initialize_ai_agent(self):
         """Initialize the AI agent"""
-        if not self.project_id:
-            raise ValueError("PROJECT_ID environment variable is required")
+        if not self.anthropic_api_key:
+            raise ValueError("ANTHROPIC_API_KEY environment variable is required")
             
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = self.google_credentials_path
-        
-        self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash-exp",
-            credentials=self.credentials,
-            project=self.project_id,
-            temperature=0.7
+        self.llm = ChatAnthropic(
+            model=self.claude_model,
+            anthropic_api_key=self.anthropic_api_key,
+            temperature=0.7,
+            max_tokens=4096
         )
-        print("✅ AI agent initialized")
+        print(f"✅ AI agent initialized with model: {self.claude_model}")
     
     async def call_mcp_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
         """Call an MCP tool"""
@@ -156,6 +135,6 @@ class MCPService:
         """Get list of available MCP tools"""
         return self.available_tools.copy()
     
-    def has_google_credentials(self) -> bool:
-        """Check if Google credentials are loaded"""
-        return self.credentials is not None
+    def has_api_key(self) -> bool:
+        """Check if Anthropic API key is available"""
+        return self.anthropic_api_key is not None
