@@ -59,10 +59,6 @@ async def create_test_notebook():
         
         logger.info(f"Creating test notebook: {notebook_filename}")
         
-        # Step 1: Create a new notebook
-        logger.debug("Creating new notebook...")
-        create_result = await mcp_service.call_mcp_tool("createNotebook", {"filename": notebook_filename})
-        logger.debug(f"Create notebook result: {create_result}")
         
         # Step 2: Add a markdown cell
         logger.debug("Adding markdown cell...")
@@ -78,8 +74,7 @@ This is a **test notebook** created by the testing controller.
 Created at: """ + datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         markdown_result = await mcp_service.call_mcp_tool("createMarkdownCell", {
-            "content": markdown_content,
-            "position": 0
+            "content": markdown_content
         })
         logger.debug(f"Markdown cell result: {markdown_result}")
         
@@ -109,8 +104,7 @@ print(f"Square root of 16: {math.sqrt(16)}")
 print("Test notebook created successfully!")"""
         
         code_result = await mcp_service.call_mcp_tool("createCodeCell", {
-            "content": code_content,
-            "position": 1
+            "content": code_content
         })
         logger.debug(f"Code cell result: {code_result}")
         

@@ -371,86 +371,119 @@ async def download_notebook(filename: str):
         if not filename.endswith('.ipynb'):
             filename += '.ipynb'
         
-        logger.debug(f"Loading notebook: {filename}")
-        # First check if the notebook exists by trying to load it
-        notebook_result = await mcp_service.call_mcp_tool("loadNotebook", {"filepath": filename})
-        logger.debug(f"Load notebook result: {notebook_result}")
-        
-        if not notebook_result or not notebook_result.get("loaded", False):
-            logger.warning(f"Notebook not found or failed to load: {filename}")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Notebook not found: {filename}"
-            )
-        
-        logger.debug(f"Saving current state and exporting notebook: {filename}")
-        # Save the current notebook state first, then export it
-        save_result = await mcp_service.call_mcp_tool("saveNotebook", {"filename": filename})
-        logger.debug(f"Save result: {save_result}")
-        
-        if not save_result.get("saved", False):
-            logger.error(f"Failed to save notebook before export: {filename}")
-            # Try to export anyway, might be an existing file
-        
-        # Read the file directly from the filesystem via MCP service
-        # We'll use a new approach - read the saved file content
+        logger.debug(f"Checking if notebook exists: {filename}")
+        # First check if the notebook exists in the list of saved notebooks
         try:
-            # Try to get the raw notebook content
             notebooks_list = await mcp_service.call_mcp_tool("listSavedNotebooks", {})
             logger.debug(f"Available notebooks: {notebooks_list}")
             
-            if filename not in notebooks_list.get("notebooks", []):
+            available_notebooks = notebooks_list.get("notebooks", [])
+            if filename not in available_notebooks:
+                logger.warning(f"Notebook not found in saved notebooks: {filename}")
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Notebook file not found in saved notebooks: {filename}"
+                    detail=f"Notebook not found: {filename}"
                 )
+        except Exception as list_error:
+            logger.error(f"Failed to list notebooks: {list_error}")
+            # Continue anyway, might still be able to load the notebook
+        
+        logger.debug(f"Attempting to load notebook: {filename}")
+        # Try to load the notebook to get the current history
+        try:
+            load_result = await mcp_service.call_mcp_tool("loadNotebook", {"filepath": filename})
+            logger.debug(f"Load notebook result: {load_result}")
             
-            # Since we can't directly read files through MCP, we'll export as JSON
-            export_result = await mcp_service.call_mcp_tool("exportNotebook", {
-                "filename": filename.replace('.ipynb', '_export.ipynb'),
-                "format": "json"
-            })
-            logger.debug(f"Export result: {export_result}")
-            
-            if not export_result.get("exported", False):
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to export notebook"
-                )
-            
-            # Create proper notebook JSON structure
-            notebook_content = {
-                "cells": [],
-                "metadata": {
-                    "kernelspec": {
-                        "display_name": "Python 3",
-                        "language": "python", 
-                        "name": "python3"
+            if not load_result or not load_result.get("loaded", False):
+                logger.warning(f"Failed to load notebook: {filename}")
+                # Create a basic notebook structure as fallback
+                notebook_content = {
+                    "cells": [
+                        {
+                            "cell_type": "markdown",
+                            "metadata": {},
+                            "source": [f"# {filename.replace('.ipynb', '')}\n\nThis notebook was exported from MCP Notebook Agent."]
+                        }
+                    ],
+                    "metadata": {
+                        "kernelspec": {
+                            "display_name": "Python 3",
+                            "language": "python",
+                            "name": "python3"
+                        },
+                        "language_info": {
+                            "name": "python",
+                            "version": "3.12.0"
+                        }
                     },
-                    "language_info": {
-                        "name": "python",
-                        "version": "3.12.0"
-                    }
-                },
-                "nbformat": 4,
-                "nbformat_minor": 4
-            }
-            
-            # If export result contains notebook data, use it
-            if isinstance(export_result, dict) and "cells" in export_result:
-                notebook_content = export_result
+                    "nbformat": 4,
+                    "nbformat_minor": 4
+                }
+            else:
+                # Get the current history info to construct the notebook
+                history_info = await mcp_service.call_mcp_tool("getHistoryInfo", {})
+                logger.debug(f"History info: {history_info}")
+                
+                # Build cells from the current notebook history
+                cells = []
+                if history_info and history_info.get("total_cells", 0) > 0:
+                    total_cells = history_info["total_cells"]
+                    
+                    for i in range(total_cells):
+                        try:
+                            cell_content = await mcp_service.call_mcp_tool("getCellContent", {"index": i})
+                            if cell_content and cell_content.get("found", False):
+                                cell_type = cell_content.get("cell_type", "code")
+                                content = cell_content.get("content", "")
+                                
+                                if cell_type == "markdown":
+                                    cell = {
+                                        "cell_type": "markdown",
+                                        "metadata": {},
+                                        "source": [content]
+                                    }
+                                else:  # code cell
+                                    cell = {
+                                        "cell_type": "code",
+                                        "execution_count": cell_content.get("execution_count"),
+                                        "metadata": {},
+                                        "outputs": cell_content.get("outputs", []),
+                                        "source": [content]
+                                    }
+                                cells.append(cell)
+                        except Exception as cell_error:
+                            logger.error(f"Failed to get cell {i}: {cell_error}")
+                            continue
+                
+                # Create the notebook structure
+                notebook_content = {
+                    "cells": cells,
+                    "metadata": {
+                        "kernelspec": {
+                            "display_name": "Python 3",
+                            "language": "python",
+                            "name": "python3"
+                        },
+                        "language_info": {
+                            "name": "python",
+                            "version": "3.12.0"
+                        }
+                    },
+                    "nbformat": 4,
+                    "nbformat_minor": 4
+                }
             
             notebook_json = json.dumps(notebook_content, indent=2, ensure_ascii=False)
             
-        except Exception as export_error:
-            logger.error(f"Export method failed: {export_error}")
+        except Exception as load_error:
+            logger.error(f"Failed to load notebook: {load_error}")
             # Fallback: create a basic notebook structure
             notebook_content = {
                 "cells": [
                     {
                         "cell_type": "markdown",
                         "metadata": {},
-                        "source": [f"# {filename.replace('.ipynb', '')}\n\nThis notebook was exported from MCP Notebook Agent."]
+                        "source": [f"# {filename.replace('.ipynb', '')}\n\nThis notebook was exported from MCP Notebook Agent.\n\nNote: Failed to load original content."]
                     }
                 ],
                 "metadata": {
