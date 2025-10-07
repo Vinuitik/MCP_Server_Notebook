@@ -26,6 +26,7 @@ const elements = {
     resultsContent: document.getElementById('results-content'),
     notebooksGrid: document.getElementById('notebooks-grid'),
     refreshNotebooksBtn: document.getElementById('refresh-notebooks-btn'),
+    refreshStatusBtn: document.getElementById('refresh-status-btn'),
     loadingModal: document.getElementById('loading-modal'),
     agentStatus: document.getElementById('agent-status'),
     mcpStatus: document.getElementById('mcp-status'),
@@ -58,6 +59,16 @@ function setupEventListeners() {
     // Notebook management
     elements.refreshNotebooksBtn.addEventListener('click', loadNotebooks);
     
+    // Status refresh
+    elements.refreshStatusBtn.addEventListener('click', function() {
+        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        this.disabled = true;
+        checkSystemStatus().finally(() => {
+            this.innerHTML = '<i class="fas fa-sync"></i>';
+            this.disabled = false;
+        });
+    });
+    
     // Quick action buttons
     document.querySelectorAll('.action-btn').forEach(btn => {
         btn.addEventListener('click', function() {
@@ -77,26 +88,52 @@ function setupEventListeners() {
 
 async function checkSystemStatus() {
     try {
-        // Check agent health
-        const healthResponse = await fetch(ENDPOINTS.health);
+        // Add cache busting timestamp
+        const timestamp = new Date().getTime();
+        
+        // Check agent health with cache busting
+        const healthResponse = await fetch(`${ENDPOINTS.health}?t=${timestamp}`);
         const healthData = await healthResponse.json();
         
         updateStatusIndicator(elements.agentStatus, elements.agentStatusText, 
             healthData.status === 'healthy', 'Connected', 'Disconnected');
         
-        // Check detailed status
-        const statusResponse = await fetch(ENDPOINTS.status);
+        // Check detailed status with cache busting
+        const statusResponse = await fetch(`${ENDPOINTS.status}?t=${timestamp}`);
+        
+        if (!statusResponse.ok) {
+            throw new Error(`Status check failed: ${statusResponse.status} ${statusResponse.statusText}`);
+        }
+        
         const statusData = await statusResponse.json();
         
         updateStatusIndicator(elements.mcpStatus, elements.mcpStatusText,
             statusData.mcp_connected, 'Connected', 'Disconnected');
             
-        console.log('📊 System Status:', { healthData, statusData });
+        console.log('📊 System Status (real-time):', { 
+            timestamp: new Date().toISOString(),
+            healthData, 
+            statusData,
+            mcp_connected: statusData.mcp_connected,
+            agent_initialized: statusData.agent_initialized
+        });
+        
+        // Show notification if status changed
+        const currentMcpStatus = statusData.mcp_connected;
+        if (window.lastMcpStatus !== undefined && window.lastMcpStatus !== currentMcpStatus) {
+            showNotification(
+                `MCP Status changed: ${currentMcpStatus ? 'Connected' : 'Disconnected'}`,
+                currentMcpStatus ? 'success' : 'warning'
+            );
+        }
+        window.lastMcpStatus = currentMcpStatus;
         
     } catch (error) {
         console.error('❌ Failed to check system status:', error);
         updateStatusIndicator(elements.agentStatus, elements.agentStatusText, false, 'Connected', 'Error');
         updateStatusIndicator(elements.mcpStatus, elements.mcpStatusText, false, 'Connected', 'Error');
+        
+        showNotification('System status check failed: ' + error.message, 'error');
     }
 }
 
@@ -267,7 +304,7 @@ async function loadNotebooks() {
         elements.refreshNotebooksBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
         
         console.log('🔄 Fetching notebooks from:', ENDPOINTS.notebooks);
-        const response = await fetch(ENDPOINTS.notebooks);
+        const response = await fetch(`${ENDPOINTS.notebooks}?t=${new Date().getTime()}`);
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -276,33 +313,40 @@ async function loadNotebooks() {
         const data = await response.json();
         console.log('📚 Raw notebooks response:', data);
         
-        // Handle different response formats
+        // Handle the new response format with error handling
         let notebooksList = [];
+        let errorMessage = null;
         
         if (data && typeof data === 'object') {
-            // If data has a notebooks property
-            if (data.notebooks) {
-                if (Array.isArray(data.notebooks)) {
-                    notebooksList = data.notebooks;
-                } else if (typeof data.notebooks === 'object') {
-                    // If notebooks is an object, try to extract values or keys
-                    notebooksList = Object.keys(data.notebooks);
-                    console.log('� Converted notebooks object to array:', notebooksList);
-                } else {
-                    console.warn('⚠️ Notebooks property is not an array or object:', typeof data.notebooks);
-                }
+            // Check if there's an error
+            if (data.error) {
+                errorMessage = data.error;
+                console.warn('⚠️ API returned error:', errorMessage);
+            }
+            
+            // Extract notebooks from the response
+            if (data.notebooks && Array.isArray(data.notebooks)) {
+                notebooksList = data.notebooks;
             } else if (Array.isArray(data)) {
-                // If the entire response is an array
                 notebooksList = data;
             } else {
-                // Try to extract from other possible properties
-                notebooksList = data.files || data.items || [];
-                console.log('📝 Extracted from alternative properties:', notebooksList);
+                console.warn('⚠️ Unexpected response format:', data);
+                notebooksList = [];
             }
+        } else {
+            console.warn('⚠️ Invalid response data:', data);
+            notebooksList = [];
         }
         
+        // Filter and clean notebook names
+        notebooksList = notebooksList.filter(notebook => 
+            notebook && 
+            typeof notebook === 'string' && 
+            notebook.trim().length > 0
+        );
+        
         console.log('📚 Final notebooks list:', notebooksList);
-        displayNotebooks(notebooksList);
+        displayNotebooks(notebooksList, errorMessage);
         
     } catch (error) {
         console.error('❌ Failed to load notebooks:', error);
@@ -316,7 +360,12 @@ async function loadNotebooks() {
             <div class="notebook-card">
                 <h4><i class="fas fa-exclamation-triangle"></i> Failed to Load Notebooks</h4>
                 <p class="text-error">Error: ${error.message}</p>
-                <p><small>Check the console for more details</small></p>
+                <p><small>Check the console for more details or try refreshing the status</small></p>
+                <div class="mt-20">
+                    <button class="btn btn-secondary" onclick="checkSystemStatus().then(() => loadNotebooks())">
+                        <i class="fas fa-sync"></i> Retry with Status Check
+                    </button>
+                </div>
             </div>
         `;
     } finally {
@@ -325,7 +374,7 @@ async function loadNotebooks() {
     }
 }
 
-function displayNotebooks(notebooks) {
+function displayNotebooks(notebooks, errorMessage = null) {
     console.log('🖥️ Displaying notebooks:', notebooks, 'Type:', typeof notebooks);
     
     // Ensure notebooks is an array
@@ -360,11 +409,24 @@ function displayNotebooks(notebooks) {
     console.log('📚 Final notebook array for display:', notebookArray);
     
     if (!notebookArray || notebookArray.length === 0) {
+        let message = 'Create your first notebook using the AI agent above!';
+        let statusInfo = '';
+        
+        if (errorMessage) {
+            message = `Unable to load notebooks: ${errorMessage}`;
+            statusInfo = `<p><small>Error: ${errorMessage}</small></p>`;
+        }
+        
         elements.notebooksGrid.innerHTML = `
             <div class="notebook-card">
-                <h4><i class="fas fa-info-circle"></i> No Notebooks Yet</h4>
-                <p>Create your first notebook using the AI agent above!</p>
-                <p><small>Checked for: ${Array.isArray(notebooks) ? 'array' : typeof notebooks}</small></p>
+                <h4><i class="fas fa-info-circle"></i> No Notebooks Available</h4>
+                <p>${message}</p>
+                ${statusInfo}
+                <div class="mt-20">
+                    <button class="btn btn-primary" onclick="checkSystemStatus()">
+                        <i class="fas fa-sync"></i> Check Connection Status
+                    </button>
+                </div>
             </div>
         `;
         return;
@@ -378,7 +440,7 @@ function displayNotebooks(notebooks) {
             return `
                 <div class="notebook-card">
                     <h4><i class="fas fa-book"></i> ${notebookName}</h4>
-                    <p>Created: ${new Date().toLocaleDateString()}</p>
+                    <p>Available for download</p>
                     <div class="notebook-actions">
                         <button class="btn btn-primary" onclick="downloadNotebook('${notebookName.replace(/'/g, "\\'")}')">
                             <i class="fas fa-download"></i> Download
@@ -394,6 +456,12 @@ function displayNotebooks(notebooks) {
         elements.notebooksGrid.innerHTML = notebooksHtml;
         console.log('✅ Successfully displayed', notebookArray.length, 'notebooks');
         
+        // Show success notification if we had previous errors
+        if (window.lastNotebookError && !errorMessage) {
+            showNotification(`Successfully loaded ${notebookArray.length} notebooks!`, 'success');
+        }
+        window.lastNotebookError = errorMessage;
+        
     } catch (error) {
         console.error('❌ Error in displayNotebooks:', error);
         elements.notebooksGrid.innerHTML = `
@@ -401,6 +469,11 @@ function displayNotebooks(notebooks) {
                 <h4><i class="fas fa-exclamation-triangle"></i> Display Error</h4>
                 <p class="text-error">Failed to display notebooks: ${error.message}</p>
                 <p><small>Data received: ${JSON.stringify(notebooks).substring(0, 100)}...</small></p>
+                <div class="mt-20">
+                    <button class="btn btn-secondary" onclick="loadNotebooks()">
+                        <i class="fas fa-sync"></i> Try Again
+                    </button>
+                </div>
             </div>
         `;
     }
@@ -531,8 +604,8 @@ function getNotificationColor(type) {
     return colors[type] || colors.info;
 }
 
-// Auto-refresh status every 30 seconds
-setInterval(checkSystemStatus, 30000);
+// Auto-refresh status every 10 seconds for better real-time updates
+setInterval(checkSystemStatus, 10000);
 
 // Auto-refresh notebooks every 2 minutes
 setInterval(loadNotebooks, 120000);
@@ -609,6 +682,41 @@ window.MCPDashboard = {
             
         } catch (error) {
             console.error('🔍 Debug fetch error:', error);
+        }
+    },
+    
+    // Debug MCP connection
+    async debugMCP() {
+        console.log('🔍 Debug: Testing MCP connection...');
+        try {
+            const response = await fetch('/api/v1/debug/mcp');
+            const data = await response.json();
+            console.log('🔍 MCP Debug Info:', data);
+            
+            showNotification('MCP debug info logged to console', 'info');
+            
+            // Display debug info in a nice format
+            let debugHtml = '<h4>MCP Connection Debug</h4>';
+            debugHtml += `<p><strong>Service exists:</strong> ${data.mcp_service_exists}</p>`;
+            debugHtml += `<p><strong>Server URL:</strong> ${data.server_url || 'N/A'}</p>`;
+            debugHtml += `<p><strong>Available tools:</strong> ${data.available_tools.length}</p>`;
+            
+            if (data.connection_tests.length > 0) {
+                debugHtml += '<h5>Endpoint Tests:</h5><ul>';
+                data.connection_tests.forEach(test => {
+                    const status = test.success ? '✅' : '❌';
+                    debugHtml += `<li>${status} ${test.url} - Status: ${test.status}</li>`;
+                });
+                debugHtml += '</ul>';
+            }
+            
+            // Show in results section temporarily
+            elements.resultsSection.style.display = 'block';
+            elements.resultsContent.innerHTML = `<div class="result-item">${debugHtml}</div>`;
+            
+        } catch (error) {
+            console.error('🔍 MCP debug error:', error);
+            showNotification('MCP debug failed: ' + error.message, 'error');
         }
     }
 };

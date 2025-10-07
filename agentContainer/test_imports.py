@@ -20,10 +20,10 @@ def test_imports():
         
         # Test LangChain imports
         try:
-            from langchain_google_genai import ChatGoogleGenerativeAI
-            print("✅ LangChain Google GenAI import works")
+            from langchain_anthropic import ChatAnthropic
+            print("✅ LangChain Anthropic import works")
         except ImportError as e:
-            print(f"❌ LangChain Google GenAI import failed: {e}")
+            print(f"❌ LangChain Anthropic import failed: {e}")
         
         # Test LangGraph imports
         try:

@@ -215,33 +215,66 @@ Remember to save your work using 'saveNotebook' when complete.
 Provide specific tool calls and code that should be executed."""
 
         logger.debug(f"Sending code attempt prompt to model")
-        response = await get_model().ainvoke(prompt)
+        
+        # Get LangChain tools from MCP service for direct tool integration
+        mcp_tools = []
+        if state["mcp_service"]:
+            try:
+                mcp_tools = state["mcp_service"].get_langchain_tools()
+                logger.info(f"Loaded {len(mcp_tools)} LangChain MCP tools")
+            except Exception as e:
+                logger.warning(f"Could not load LangChain tools: {e}")
+        
+        # If we have tools, bind them to the model for direct tool calling
+        if mcp_tools:
+            model_with_tools = get_model().bind_tools(mcp_tools)
+            response = await model_with_tools.ainvoke(prompt)
+        else:
+            response = await get_model().ainvoke(prompt)
+            
         response_text = response.content if hasattr(response, 'content') else str(response)
         logger.info(f"Model response received for code attempt (length: {len(response_text)})")
         logger.debug(f"Model response: {response_text[:500]}...")
         
-        # Try to execute MCP tools based on the response
-        if state["mcp_service"]:
-            logger.debug("Attempting to execute MCP tools based on response")
+        # Check if model made tool calls
+        if hasattr(response, 'tool_calls') and response.tool_calls:
+            logger.info(f"Model made {len(response.tool_calls)} tool calls")
+            
+            for tool_call in response.tool_calls:
+                try:
+                    tool_name = tool_call['name']
+                    tool_args = tool_call['args']
+                    logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
+                    
+                    result = await state["mcp_service"].call_mcp_tool(tool_name, tool_args)
+                    response_text += f"\n\n✅ Tool '{tool_name}' executed successfully: {result}"
+                    logger.info(f"Tool execution result: {result}")
+                    
+                except Exception as e:
+                    error_msg = f"❌ Error executing tool '{tool_call.get('name', 'unknown')}': {str(e)}"
+                    logger.error(error_msg)
+                    response_text += f"\n\n{error_msg}"
+        
+        # Fallback: Try to execute MCP tools based on text parsing (legacy approach)
+        elif state["mcp_service"]:
+            logger.debug("No tool calls found, attempting text-based tool parsing")
             try:
                 # Parse potential tool calls from the response
-                # This is a simplified approach - in practice you'd want more sophisticated parsing
                 if "saveNotebook" in response_text:
                     logger.info("Found saveNotebook command in response")
-                    # Extract filename if mentioned
                     filename = "agent_notebook.ipynb"  # default
                     logger.debug(f"Saving notebook as: {filename}")
                     result = await state["mcp_service"].call_mcp_tool("saveNotebook", {"filename": filename})
-                    response_text += f"\n\nNotebook saved: {result}"
+                    response_text += f"\n\n✅ Notebook saved: {result}"
                     logger.info(f"Notebook save result: {result}")
                 
                 if "createCodeCell" in response_text:
                     logger.info("Found createCodeCell command in response")
-                    # This would need to be implemented in your MCP service
-                    logger.debug("createCodeCell functionality not yet implemented")
+                    # This would need more sophisticated parsing
+                    logger.debug("createCodeCell would need content extraction from response")
                     
             except Exception as e:
-                error_msg = f"Error using MCP tools: {str(e)}"
+                error_msg = f"❌ Error using MCP tools: {str(e)}"
                 logger.error(error_msg)
                 logger.error(f"MCP tools error traceback: {traceback.format_exc()}")
                 response_text += f"\n\n{error_msg}"
@@ -288,8 +321,36 @@ builder.add_edge("finished", END)
 graph = builder.compile()
 
 async def create_agent_with_mcp(mcp_service: MCPService):
-    """Factory function to create an agent with MCP service"""
-    return graph
+    """Factory function to create an agent with MCP service pre-configured"""
+    # Create a new state graph instance
+    builder = StateGraph(AgenticState)
+    builder.add_node("entry", entry)
+    builder.add_node("refining", refining)
+    builder.add_node("codeAttempt", code_attempt)
+    builder.add_node("finished", finished)
+
+    builder.set_entry_point("entry")
+    builder.add_edge("entry", "codeAttempt")
+    builder.add_edge("codeAttempt", "refining")
+
+    builder.add_conditional_edges(
+        "refining",
+        lambda state: "codeAttempt" if state.get("keep_refining", False) else "finished",
+        {
+            "codeAttempt": "codeAttempt",
+            "finished": "finished"
+        }
+    )
+
+    builder.add_edge("finished", END)
+    
+    # Compile the graph
+    mcp_graph = builder.compile()
+    
+    # Store reference to MCP service (optional enhancement for future use)
+    mcp_graph._mcp_service = mcp_service
+    
+    return mcp_graph
 
 async def run_agent(task: str, mcp_service: MCPService) -> Dict[str, Any]:
     """Run the agent with a given task and MCP service"""

@@ -21,9 +21,8 @@ class PromptManager:
             prompts_dir: Directory containing prompt files. If None, uses default.
         """
         if prompts_dir is None:
-            # Default to prompts directory relative to this file
-            current_dir = Path(__file__).parent
-            self.prompts_dir = current_dir / "prompts"
+            # Default to the directory containing this file (the prompts directory)
+            self.prompts_dir = Path(__file__).parent
         else:
             self.prompts_dir = Path(prompts_dir)
         

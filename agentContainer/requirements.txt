@@ -3,8 +3,9 @@ fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
 pydantic>=2.7.4
 
-# MCP Client
+# MCP Client with LangChain adapters
 fastmcp>=2.0.0
+langchain-mcp-adapters>=0.1.0
 
 # Anthropic Claude AI
 anthropic>=0.23.0

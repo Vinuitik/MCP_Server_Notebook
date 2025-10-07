@@ -281,7 +281,7 @@ async def test_mcp_tools():
             "mcp_service_status": {
                 "initialized": mcp_service.is_initialized(),
                 "connected": mcp_service.is_connected(),
-                "has_credentials": mcp_service.has_google_credentials()
+                "has_credentials": mcp_service.has_api_key()
             }
         }
         

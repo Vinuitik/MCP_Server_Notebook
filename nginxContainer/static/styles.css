@@ -50,6 +50,7 @@ body {
 .status-indicators {
     display: flex;
     gap: 20px;
+    align-items: center;
     flex-wrap: wrap;
 }
 
@@ -186,6 +187,21 @@ body {
     opacity: 0.6;
     cursor: not-allowed;
     transform: none !important;
+}
+
+.btn-small {
+    padding: 8px 12px;
+    font-size: 0.875rem;
+    border-radius: 8px;
+    min-width: auto;
+    background: rgba(108, 117, 125, 0.1);
+    color: #6c757d;
+    border: 1px solid rgba(108, 117, 125, 0.2);
+}
+
+.btn-small:hover {
+    background: rgba(108, 117, 125, 0.2);
+    transform: translateY(-1px);
 }
 
 .form-actions {

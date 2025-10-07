@@ -74,9 +74,61 @@ async def health_check():
         )
 
 
+@router.get("/debug/mcp")
+async def debug_mcp_connection():
+    """Debug MCP connection status and try different endpoints"""
+    logger.info("MCP debug requested")
+    
+    debug_info = {
+        "mcp_service_exists": mcp_service is not None,
+        "connection_tests": [],
+        "available_tools": [],
+        "server_url": None
+    }
+    
+    if not mcp_service:
+        return debug_info
+    
+    debug_info["server_url"] = mcp_service.mcp_server_url
+    debug_info["available_tools"] = mcp_service.get_available_tools()
+    
+    # Test various endpoints
+    test_endpoints = [
+        "/health",
+        "/noteBooks/",
+        "/noteBooks/info",
+        "/noteBooks/tools",
+        "/tools",
+        "/info"
+    ]
+    
+    import httpx
+    for endpoint in test_endpoints:
+        url = f"{mcp_service.mcp_server_url}{endpoint}"
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(url)
+                debug_info["connection_tests"].append({
+                    "url": url,
+                    "status": response.status_code,
+                    "success": response.status_code == 200,
+                    "response_size": len(response.text),
+                    "content_type": response.headers.get("content-type", "unknown")
+                })
+        except Exception as e:
+            debug_info["connection_tests"].append({
+                "url": url,
+                "status": "error",
+                "success": False,
+                "error": str(e)
+            })
+    
+    return debug_info
+
+
 @router.get("/status", response_model=AgentStatusResponse)
 async def get_status():
-    """Get detailed agent status"""
+    """Get detailed agent status with real-time connection check"""
     logger.info("Status check requested")
     try:
         if not mcp_service:
@@ -88,22 +140,26 @@ async def get_status():
         
         logger.debug("Checking MCP service status...")
         agent_initialized = mcp_service.is_initialized()
-        mcp_connected = mcp_service.is_connected()
+        
+        # Do real-time connection check
+        logger.debug("Performing real-time MCP connection check...")
+        mcp_connected = await mcp_service.check_connection_status()
+        
         available_tools = mcp_service.get_available_tools()
-        google_credentials_loaded = mcp_service.has_google_credentials()
+        anthropic_api_key_loaded = mcp_service.has_api_key()
         
         logger.debug(f"Agent initialized: {agent_initialized}")
-        logger.debug(f"MCP connected: {mcp_connected}")
+        logger.debug(f"MCP connected (real-time): {mcp_connected}")
         logger.debug(f"Available tools: {available_tools}")
-        logger.debug(f"Google credentials loaded: {google_credentials_loaded}")
+        logger.debug(f"Anthropic API key loaded: {anthropic_api_key_loaded}")
         
         response = AgentStatusResponse(
             agent_initialized=agent_initialized,
             mcp_connected=mcp_connected,
             available_tools=available_tools,
-            google_credentials_loaded=google_credentials_loaded
+            anthropic_api_key_loaded=anthropic_api_key_loaded
         )
-        logger.info(f"Status response: {response}")
+        logger.info(f"Status response: agent_initialized={agent_initialized} mcp_connected={mcp_connected} available_tools={available_tools} anthropic_api_key_loaded={anthropic_api_key_loaded}")
         return response
     except HTTPException:
         raise
@@ -174,51 +230,110 @@ async def list_notebooks():
     try:
         if not mcp_service:
             logger.error("MCP service is None")
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="MCP service not initialized"
-            )
+            # Return empty list instead of error
+            return {
+                "notebooks": [],
+                "success": False,
+                "count": 0,
+                "message": "MCP service not initialized",
+                "error": "MCP service not initialized"
+            }
         
-        if not mcp_service.is_connected():
-            logger.error("MCP service not connected")
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="MCP service not connected"
-            )
+        # Do real-time connection check
+        logger.debug("Performing real-time MCP connection check for list notebooks...")
+        try:
+            mcp_connected = await mcp_service.check_connection_status()
+        except Exception as conn_error:
+            logger.error(f"Connection check failed: {conn_error}")
+            mcp_connected = False
+        
+        if not mcp_connected:
+            logger.error("MCP service not connected (real-time check failed)")
+            # Return empty list instead of HTTP error
+            return {
+                "notebooks": [],
+                "success": False,
+                "count": 0,
+                "message": "MCP service not connected - try refreshing status",
+                "error": "MCP service not connected"
+            }
         
         logger.debug("Calling list_notebooks on MCP service")
-        result = await mcp_service.list_notebooks()
-        logger.debug(f"List notebooks result: {result}")
+        try:
+            result = await mcp_service.list_notebooks()
+            logger.debug(f"List notebooks result: {result}")
+        except Exception as list_error:
+            logger.error(f"Failed to call list_notebooks: {list_error}")
+            # Return empty list with error info
+            return {
+                "notebooks": [],
+                "success": False,
+                "count": 0,
+                "message": f"Failed to retrieve notebooks: {str(list_error)}",
+                "error": str(list_error)
+            }
         
         # Extract the notebooks list from the MCP service response
         if isinstance(result, dict) and "notebooks" in result:
             notebooks_list = result["notebooks"]
             success = result.get("success", True)
             message = result.get("message", "Notebooks retrieved successfully")
-        else:
-            # Fallback: assume result is already a list
-            notebooks_list = result if isinstance(result, list) else []
+        elif isinstance(result, list):
+            # If result is directly a list
+            notebooks_list = result
             success = True
             message = f"Found {len(notebooks_list)} notebooks"
+        elif isinstance(result, str):
+            # If result is a string, try to parse or treat as single item
+            try:
+                import json as json_parser
+                parsed_result = json_parser.loads(result)
+                if isinstance(parsed_result, list):
+                    notebooks_list = parsed_result
+                else:
+                    notebooks_list = [result] if result.strip() else []
+            except:
+                notebooks_list = [result] if result.strip() else []
+            success = True
+            message = f"Found {len(notebooks_list)} notebooks"
+        else:
+            # Fallback: treat as empty
+            notebooks_list = []
+            success = False
+            message = "No notebooks found or unexpected response format"
+        
+        # Ensure notebooks_list is always a list of strings
+        if not isinstance(notebooks_list, list):
+            notebooks_list = []
+        
+        # Filter and clean notebook names
+        clean_notebooks = []
+        for notebook in notebooks_list:
+            if isinstance(notebook, str) and notebook.strip():
+                clean_notebooks.append(notebook.strip())
+            elif notebook:  # Convert to string if not None/empty
+                clean_notebooks.append(str(notebook).strip())
         
         response = {
-            "notebooks": notebooks_list,
+            "notebooks": clean_notebooks,
             "success": success,
-            "count": len(notebooks_list) if isinstance(notebooks_list, list) else 0,
+            "count": len(clean_notebooks),
             "message": message
         }
-        logger.info(f"List notebooks successful, found {len(notebooks_list) if isinstance(notebooks_list, list) else 'unknown'} notebooks")
+        logger.info(f"List notebooks successful, found {len(clean_notebooks)} notebooks: {clean_notebooks}")
         return response
         
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Failed to list notebooks: {str(e)}")
+        logger.error(f"Unexpected error in list_notebooks: {str(e)}")
         logger.error(f"Traceback: {traceback.format_exc()}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list notebooks: {str(e)}"
-        )
+        # Return error response instead of raising HTTP exception
+        return {
+            "notebooks": [],
+            "success": False,
+            "count": 0,
+            "message": f"Error retrieving notebooks: {str(e)}",
+            "error": str(e)
+        }
 
 
 @router.post("/notebooks")
@@ -292,8 +407,12 @@ async def run_agent_task(request: AgentTaskRequest):
                 detail="MCP service not initialized"
             )
         
-        if not mcp_service.is_connected():
-            logger.error("MCP service not connected")
+        # Do real-time connection check
+        logger.debug("Performing real-time MCP connection check before task execution...")
+        mcp_connected = await mcp_service.check_connection_status()
+        
+        if not mcp_connected:
+            logger.error("MCP service not connected (real-time check failed)")
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="MCP service not connected"

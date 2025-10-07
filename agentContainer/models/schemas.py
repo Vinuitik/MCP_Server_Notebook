@@ -36,7 +36,7 @@ class AgentStatusResponse(BaseModel):
     agent_initialized: bool
     mcp_connected: bool
     available_tools: List[str]
-    google_credentials_loaded: bool
+    anthropic_api_key_loaded: bool
 
 
 class ChatMessage(BaseModel):
