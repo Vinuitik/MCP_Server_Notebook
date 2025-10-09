@@ -4,7 +4,7 @@ MCP Service - Handles all MCP server interactions
 import os
 import asyncio
 from typing import Dict, Any, List, Optional
-from langchain_anthropic import ChatAnthropic
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 
@@ -12,7 +12,7 @@ class MCPService:
     """Service for managing MCP server connections and operations"""
     
     def __init__(self):
-        self.llm: Optional[ChatAnthropic] = None
+        self.llm: Optional[ChatGoogleGenerativeAI] = None
         self.mcp_client: Optional[MultiServerMCPClient] = None
         self.mcp_tools: List[Any] = []
         self.available_tools: List[str] = []
@@ -20,8 +20,7 @@ class MCPService:
         self._connected = False
         
         # Environment variables
-        self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
-        self.claude_model = os.getenv("CLAUDE_MODEL", "claude-3-5-sonnet-20241022")
+        self.gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
         self.mcp_server_url = os.getenv("MCP_SERVER_URL", "http://localhost:8002")
         
     async def initialize(self) -> bool:
@@ -35,7 +34,7 @@ class MCPService:
             return True
             
         except Exception as e:
-            print(f"❌ Failed to initialize MCP service: {e}")
+            print(f"❌ CRITICAL ERROR: Failed to initialize MCP service: {e}")
             return False
     
     async def _connect_to_mcp_server(self):
@@ -65,10 +64,10 @@ class MCPService:
             self.available_tools = [tool.name for tool in self.mcp_tools]
             
             self._connected = True
-            print(f"✅ Connected to MCP server via streamable HTTP. Available tools: {self.available_tools}")
+            print(f"✅ Connected to MCP server. Available tools: {len(self.available_tools)}")
             
         except Exception as e:
-            print(f"❌ Failed to connect to MCP server: {e}")
+            print(f"❌ CRITICAL ERROR: Failed to connect to MCP server: {e}")
             print(f"🔧 Attempted connection to: {full_url}")
             print(f"🔧 Make sure MCP server is running on {self.mcp_server_url}")
             self._connected = False
@@ -94,7 +93,7 @@ class MCPService:
                 raise ValueError(f"Tool object for '{tool_name}' not found")
             
             # Call the tool using its run method
-            result = await tool_obj.run(arguments)
+            result = await tool_obj.arun(arguments)
             
             print(f"✅ MCP tool call '{tool_name}' succeeded")
             return result
@@ -152,6 +151,7 @@ class MCPService:
         """Get the actual LangChain tool objects for agent integration"""
         return self.mcp_tools.copy()
     
-    def has_api_key(self) -> bool:
-        """Check if Anthropic API key is available"""
-        return self.anthropic_api_key is not None
+    def has_credentials(self) -> bool:
+        """Check if Google credentials are available"""
+        google_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        return google_creds is not None and os.path.exists(google_creds)

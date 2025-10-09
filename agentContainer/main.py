@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
     # Startup
     success = await mcp_service.initialize()
     if not success:
-        print("❌ Failed to initialize MCP service")
+        print("❌ CRITICAL ERROR: Failed to initialize MCP service")
         sys.exit(1)
     
     # Inject service into controllers

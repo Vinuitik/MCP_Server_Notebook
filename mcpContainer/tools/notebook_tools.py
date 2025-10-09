@@ -10,8 +10,7 @@ from schema import (
     SaveNotebookResponse,
     ListNotebooksResponse,
     DeleteNotebookResponse,
-    LoadNotebookResponse,
-    ExportNotebookResponse
+    LoadNotebookResponse
 )
 
 def register_notebook_tools(mcp: FastMCP, notebook_state: NotebookState):
@@ -268,109 +267,4 @@ def register_notebook_tools(mcp: FastMCP, notebook_state: NotebookState):
                 "loaded": False,
                 "cells_loaded": 0,
                 "message": f"Failed to load notebook: {str(e)}"
-            }
-
-    @mcp.tool()
-    @debug_tool
-    def exportNotebook(filename: str, format: str = "json") -> ExportNotebookResponse:
-        """
-        Export the current notebook to different formats.
-        
-        Args:
-            filename: The name of the file to export to
-            format: The format to export to ("json", "py", "md")
-            
-        Returns:
-            Dictionary with:
-            - exported: bool (True if successful, False otherwise)
-            - filepath: str (full path to exported file)
-            - message: str (status message)
-        """
-        try:
-            notebooks_dir = '/app/notebooks'
-            os.makedirs(notebooks_dir, exist_ok=True)
-            
-            if format == "json":
-                # Export as JSON (same as saveNotebook but different function)
-                return saveNotebook(filename)
-                
-            elif format == "py":
-                # Export as Python script
-                if not filename.endswith('.py'):
-                    filename += '.py'
-                
-                filepath = os.path.join(notebooks_dir, filename)
-                
-                with open(filepath, 'w', encoding='utf-8') as f:
-                    f.write("# Jupyter Notebook exported to Python\n")
-                    f.write(f"# Generated on {datetime.now().isoformat()}\n\n")
-                    
-                    for i, cell in enumerate(notebook_state.history):
-                        if cell.cell_type == "markdown":
-                            # Convert markdown to comments
-                            f.write(f"# Cell {i} - Markdown\n")
-                            for line in cell.source.split('\n'):
-                                f.write(f"# {line}\n")
-                            f.write("\n")
-                        
-                        elif cell.cell_type == "code":
-                            f.write(f"# Cell {i} - Code\n")
-                            if hasattr(cell, 'execution_count') and cell.execution_count:
-                                f.write(f"# Execution count: {cell.execution_count}\n")
-                            f.write(cell.source)
-                            f.write("\n\n")
-                
-            elif format == "md":
-                # Export as Markdown
-                if not filename.endswith('.md'):
-                    filename += '.md'
-                
-                filepath = os.path.join(notebooks_dir, filename)
-                
-                with open(filepath, 'w', encoding='utf-8') as f:
-                    f.write("# Jupyter Notebook\n\n")
-                    f.write(f"*Exported on {datetime.now().isoformat()}*\n\n")
-                    
-                    for i, cell in enumerate(notebook_state.history):
-                        if cell.cell_type == "markdown":
-                            f.write(cell.source)
-                            f.write("\n\n")
-                        
-                        elif cell.cell_type == "code":
-                            f.write("```python\n")
-                            f.write(cell.source)
-                            f.write("\n```\n\n")
-                            
-                            # Add outputs if available
-                            if hasattr(cell, 'outputs') and cell.outputs:
-                                for output in cell.outputs:
-                                    if output.get('output_type') == 'stream':
-                                        f.write("```\n")
-                                        f.write(output.get('text', ''))
-                                        f.write("\n```\n\n")
-                                    elif output.get('output_type') == 'execute_result':
-                                        data = output.get('data', {})
-                                        if 'text/plain' in data:
-                                            f.write("```\n")
-                                            f.write(data['text/plain'])
-                                            f.write("\n```\n\n")
-            
-            else:
-                return {
-                    "exported": False,
-                    "filepath": "",
-                    "message": f"Unsupported format: {format}. Supported formats: json, py, md"
-                }
-            
-            return {
-                "exported": True,
-                "filepath": filepath,
-                "message": f"Notebook exported successfully to {filepath} in {format} format"
-            }
-            
-        except Exception as e:
-            return {
-                "exported": False,
-                "filepath": "",
-                "message": f"Failed to export notebook: {str(e)}"
             }

@@ -18,19 +18,23 @@ def install_dependencies():
         print(f"❌ Failed to install dependencies: {e}")
         return False
 
-def check_api_key():
-    """Check if API key is configured"""
+def check_credentials():
+    """Check if Google credentials are configured"""
     load_dotenv()
-    api_key = os.getenv('ANTHROPIC_API_KEY')
+    google_creds = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
     
-    if not api_key:
-        print("❌ ANTHROPIC_API_KEY not found in .env file")
-        print("💡 Please add your API key to the .env file:")
-        print("   ANTHROPIC_API_KEY=sk-ant-api03-YOUR_KEY_HERE")
+    if not google_creds:
+        print("❌ GOOGLE_APPLICATION_CREDENTIALS not found in .env file")
+        print("💡 Please add your service account key path to the .env file:")
+        print("   GOOGLE_APPLICATION_CREDENTIALS=./service-account-key.json")
         return False
     
-    masked_key = f"{'*' * (len(api_key) - 4)}{api_key[-4:]}" if len(api_key) > 4 else "*" * len(api_key)
-    print(f"✅ API key found: {masked_key}")
+    if not os.path.exists(google_creds):
+        print(f"❌ Google service account key file not found: {google_creds}")
+        print("💡 Please ensure the service account key file exists at the specified path")
+        return False
+    
+    print(f"✅ Google credentials found: {google_creds}")
     return True
 
 def main():
@@ -41,8 +45,8 @@ def main():
     if not install_dependencies():
         return False
     
-    # Check API key
-    if not check_api_key():
+    # Check credentials
+    if not check_credentials():
         return False
     
     print("\n🎉 Setup complete! You can now run the application:")

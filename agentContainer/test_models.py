@@ -1,49 +1,48 @@
 #!/usr/bin/env python3
 """
-Script to list available Claude models and test model initialization
+Script to list available Gemini models and test model initialization
 """
 import os
 from dotenv import load_dotenv
 
 def list_available_models():
-    """List available Claude models"""
-    print("🔍 Checking available Claude models...")
+    """List available Gemini models"""
+    print("🔍 Checking available Gemini models...")
     
     # Load environment variables
     load_dotenv()
     
-    # Common Claude model names
+    # Common Gemini model names
     common_models = [
-        "claude-3-5-sonnet-20241022",
-        "claude-3-opus-20240229", 
-        "claude-3-sonnet-20240229",
-        "claude-3-haiku-20240307",
-        "claude-3-5-haiku-20241022"
+        "gemini-2.0-flash-exp",
+        "gemini-1.5-pro",
+        "gemini-1.5-flash",
+        "gemini-1.0-pro"
     ]
     
-    print("📋 Available Claude models:")
+    print("📋 Available Gemini models:")
     for model in common_models:
         print(f"  📝 {model}")
     
     # Test with LangChain
     print("\n🧪 Testing LangChain integration:")
     
-    api_key = os.getenv('ANTHROPIC_API_KEY')
-    if not api_key:
-        print("❌ ANTHROPIC_API_KEY not set")
+    google_creds = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+    if not google_creds or not os.path.exists(google_creds):
+        print("❌ GOOGLE_APPLICATION_CREDENTIALS not set or file not found")
         return
     
-    test_models = ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
+    test_models = ["gemini-2.0-flash-exp", "gemini-1.5-flash"]
     
     for model in test_models:
         try:
-            from langchain_anthropic import ChatAnthropic
+            from langchain_google_genai import ChatGoogleGenerativeAI
             
-            llm = ChatAnthropic(
+            llm = ChatGoogleGenerativeAI(
                 model=model,
-                anthropic_api_key=api_key,
                 temperature=0.7,
-                max_tokens=1000
+                max_tokens=1000,
+                convert_system_message_to_human=True
             )
             
             # Try a simple call
@@ -51,7 +50,7 @@ def list_available_models():
             print(f"  ✅ {model} - Working! Response: {response.content[:50]}...")
             
         except ImportError:
-            print(f"  ❌ {model} - langchain-anthropic not installed")
+            print(f"  ❌ {model} - langchain-google-genai not installed")
         except Exception as e:
             print(f"  ❌ {model} - Failed: {str(e)[:100]}...")
 
@@ -59,23 +58,23 @@ def test_current_model():
     """Test the currently configured model"""
     load_dotenv()
     
-    model_name = os.getenv('CLAUDE_MODEL', 'claude-3-5-sonnet-20241022')
-    api_key = os.getenv('ANTHROPIC_API_KEY')
+    model_name = os.getenv('GEMINI_MODEL', 'gemini-2.0-flash-exp')
+    google_creds = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
     
     print(f"\n🎯 Testing current model: {model_name}")
     
-    if not api_key:
-        print("❌ ANTHROPIC_API_KEY not set")
+    if not google_creds or not os.path.exists(google_creds):
+        print("❌ GOOGLE_APPLICATION_CREDENTIALS not set or file not found")
         return False
     
     try:
-        from langchain_anthropic import ChatAnthropic
+        from langchain_google_genai import ChatGoogleGenerativeAI
         
-        llm = ChatAnthropic(
+        llm = ChatGoogleGenerativeAI(
             model=model_name,
-            anthropic_api_key=api_key,
             temperature=0.7,
-            max_tokens=1000
+            max_tokens=1000,
+            convert_system_message_to_human=True
         )
         
         # Test with a simple prompt
@@ -88,7 +87,7 @@ def test_current_model():
         return True
         
     except ImportError:
-        print("❌ langchain-anthropic package not installed. Run: pip install langchain-anthropic")
+        print("❌ langchain-google-genai package not installed. Run: pip install langchain-google-genai")
         return False
     except Exception as e:
         print(f"❌ Model {model_name} failed: {e}")

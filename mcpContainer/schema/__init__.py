@@ -19,7 +19,6 @@ from .save_notebook_response import SaveNotebookResponse
 from .list_notebooks_response import ListNotebooksResponse
 from .delete_notebook_response import DeleteNotebookResponse
 from .load_notebook_response import LoadNotebookResponse
-from .export_notebook_response import ExportNotebookResponse
 
 # Execution operation schemas
 from .execute_code_cell_response import ExecuteCodeCellResponse
@@ -41,7 +40,6 @@ __all__ = [
     'ListNotebooksResponse',
     'DeleteNotebookResponse',
     'LoadNotebookResponse',
-    'ExportNotebookResponse',
     # Execution operation schemas
     'ExecuteCodeCellResponse',
     'ExecuteAllCellsResponse',

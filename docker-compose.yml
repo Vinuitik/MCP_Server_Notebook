@@ -5,7 +5,8 @@ services:
       dockerfile: Dockerfile
     container_name: mcp-notebook-server
     ports:
-      - "9002:8002"
+      - "9002:8002"  # MCP server
+      - "9003:8003"  # FastAPI server
     networks:
       - app-network
     environment:
