@@ -4,6 +4,7 @@ Main FastAPI application for MCP Agent
 import os
 import sys
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 import uvicorn
@@ -11,13 +12,18 @@ from dotenv import load_dotenv
 
 from services.mcp_service import MCPService
 from controllers.agent_controller import router as agent_router, set_mcp_service
-from controllers.testing_controller import router as testing_router, set_mcp_service as set_testing_mcp_service
 
 # Load environment variables
 load_dotenv()
 
+# Configure logging levels to reduce noise
+logging.getLogger("mcp.client").setLevel(logging.WARNING)  # Reduce MCP client logs
+logging.getLogger("httpx").setLevel(logging.WARNING)       # Reduce HTTP client logs
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)  # Reduce access logs
+
 # Global service instance
 mcp_service = MCPService()
+
 
 
 @asynccontextmanager
@@ -33,7 +39,6 @@ async def lifespan(app: FastAPI):
     
     # Inject service into controllers
     set_mcp_service(mcp_service)
-    set_testing_mcp_service(mcp_service)
     
     print("✅ MCP Agent is ready!")
     
@@ -53,7 +58,6 @@ app = FastAPI(
 
 # Include routers
 app.include_router(agent_router, prefix="/api/v1", tags=["agent"])
-app.include_router(testing_router, prefix="/api/v1/testing", tags=["testing"])
 
 
 @app.get("/")
@@ -78,5 +82,6 @@ if __name__ == "__main__":
         host=host,
         port=port,
         reload=False,
-        log_level="info"
+        log_level="warning",  # Reduce from "info" to "warning"
+        access_log=False      # Disable access logs completely
     )

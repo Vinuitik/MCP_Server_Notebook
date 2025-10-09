@@ -24,7 +24,7 @@ from models.schemas import (
     NotebookDownloadResponse
 )
 from services.mcp_service import MCPService
-from agent import run_agent
+from agent.agent import run_agent
 
 # Set up logging - INFO level to reduce noise
 logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(name)s - %(message)s')
@@ -85,7 +85,7 @@ async def get_status():
         mcp_connected = await mcp_service.check_connection_status()
         
         available_tools = mcp_service.get_available_tools()
-        anthropic_api_key_loaded = mcp_service.has_api_key()
+        anthropic_api_key_loaded = mcp_service.has_credentials()
         
         response = AgentStatusResponse(
             agent_initialized=agent_initialized,
@@ -370,7 +370,7 @@ async def download_notebook(filename: str):
         logger.debug(f"Fetching notebook file from FastAPI server: {filename}")
         
         # Use the new FastAPI endpoint (port 8003) for file download
-        fastapi_download_url = f"http://localhost:8003/notebooks/{filename}"
+        fastapi_download_url = f"http://mcp-server:8003/notebooks/{filename}"
         
         async with httpx.AsyncClient() as client:
             response = await client.get(fastapi_download_url)

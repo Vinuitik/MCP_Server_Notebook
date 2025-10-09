@@ -67,7 +67,7 @@ def get_model():
             logger.debug(f"🔑 Google ADC credentials set: {credentials_path}")
             
             # Get model name from environment or use default
-            model_name = os.getenv('GEMINI_MODEL', 'gemini-2.0-flash-exp')
+            model_name = os.getenv('GEMINI_MODEL', 'gemini-2.0')
             logger.debug(f"🎯 Using model: {model_name}")
             
             # Initialize the model
@@ -159,7 +159,7 @@ Available MCP Tools: {', '.join(state.get('available_tools', []))}
 Provide a refined task description that makes use of the available notebook tools and follows the MCP stateful workflow."""
         
         logger.debug(f"🤖 Sending prompt to model (length: {len(prompt)})")
-        response = await get_model().invoke(prompt)
+        response = await get_model().ainvoke(prompt)
         response_content = response.content if hasattr(response, 'content') else str(response)
         
         logger.info(f"✅ ENTRY phase completed")

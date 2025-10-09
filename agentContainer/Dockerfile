@@ -11,8 +11,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # Copy the agent application and configuration
 COPY main.py .
-COPY agent.py .
+COPY agent/ ./agent/
 COPY .env .
+COPY service-account-key.json .
 COPY models/ ./models/
 COPY services/ ./services/
 COPY controllers/ ./controllers/
